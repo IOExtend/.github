@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./banner.png" alt="IOExtend Banner" width="100%" style="max-width: 960px; border-radius: 12px;" />
+<img src="https://raw.githubusercontent.com/IOExtend/.github/main/profile/banner.png" alt="IOExtend Banner" width="100%" style="max-width: 960px; border-radius: 12px;" />
 
 # IOExtend
 
