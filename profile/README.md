@@ -21,38 +21,40 @@
 
 ## The Ecosystem
 
-IOExtend provides a unified suite of independent, zero-dependency .NET engines designed for high-throughput cloud microservices, CI/CD pipelines, web backends, and desktop engineering software.
+IOExtend provides a unified suite of independent, zero-dependency .NET engines and viewer tools designed for high-throughput cloud microservices, CI/CD pipelines, web backends, and desktop engineering software.
 
 | Project | Primary Formats | Key Capabilities | Documentation | NuGet | Release | Brand Palette |
 |:---|:---|:---|:---:|:---:|:---:|:---:|
-| **[RvtIO](https://github.com/IOExtend/RvtIO)** | `.rvt`, `.rfa` (2020–2026) | Full Revit OLE/Compound file container extraction, element tables, geometry, schema decoders, parameter reflection | [![Docs](https://img.shields.io/badge/Docs-Online-F2A33A?style=flat-square&logo=github)](https://ioextend.github.io/RvtIO/) | [![NuGet](https://img.shields.io/nuget/v/RvtIO?style=flat-square&color=F2A33A&logo=nuget)](https://www.nuget.org/packages/RvtIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/RvtIO?style=flat-square&color=F2A33A)](https://github.com/IOExtend/RvtIO/releases) | `Amber` `#F2A33A` |
-| **[NwcIO](https://github.com/IOExtend/NwcIO)** | `.nwc`, `.nwd`, `.nwf` | Navisworks binary `#LcUStream` parser, 3D mesh reconstruction, BVH spatial index, clash detection, IFC4/glTF/BCF exporters | [![Docs](https://img.shields.io/badge/Docs-Online-3B82F6?style=flat-square&logo=github)](https://ioextend.github.io/NwcIO/) | [![NuGet](https://img.shields.io/nuget/v/NwcIO?style=flat-square&color=3B82F6&logo=nuget)](https://www.nuget.org/packages/NwcIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/NwcIO?style=flat-square&color=3B82F6)](https://github.com/IOExtend/NwcIO/releases) | `Azure Blue` `#3B82F6` |
-| **[IfcIO](https://github.com/IOExtend/IfcIO)** | `.ifc`, `.ifczip` | Pure managed ISO 10303-21 STEP engine for buildingSMART IFC2x3 & IFC4 schemas, faceted B-Rep and modern tessellation | [![Docs](https://img.shields.io/badge/Docs-Online-A855F7?style=flat-square&logo=github)](https://ioextend.github.io/IfcIO/) | [![NuGet](https://img.shields.io/nuget/v/IfcIO?style=flat-square&color=A855F7&logo=nuget)](https://www.nuget.org/packages/IfcIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/IfcIO?style=flat-square&color=A855F7)](https://github.com/IOExtend/IfcIO/releases) | `Electric Violet` `#A855F7` |
+| **[RvtIO](https://github.com/IOExtend/RvtIO)** | `.rvt`, `.rfa` (Revit 2020–2026, 2027 partial) | Elements, parameters, geometry, file metadata and project information, `FilteredElementCollector` queries, IFC2X3 and JSON export | [![Docs](https://img.shields.io/badge/Docs-Online-F2A33A?style=flat-square&logo=github)](https://ioextend.github.io/RvtIO/) | [![NuGet](https://img.shields.io/nuget/v/RvtIO?style=flat-square&color=F2A33A&logo=nuget)](https://www.nuget.org/packages/RvtIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/RvtIO?style=flat-square&color=F2A33A)](https://github.com/IOExtend/RvtIO/releases) | `Amber` `#F2A33A` |
+| **[NwcIO](https://github.com/IOExtend/NwcIO)** | `.nwc`, `.nwd`, `.nwf` | Navisworks binary `LcUStream` parser, scene hierarchy and meshes, clash detection and clash matrix, BCF 2.1, 4D TimeLiner, IFC2X3/IFC4, glTF, OBJ, HTML and JSON export | [![Docs](https://img.shields.io/badge/Docs-Online-3B82F6?style=flat-square&logo=github)](https://ioextend.github.io/NwcIO/) | [![NuGet](https://img.shields.io/nuget/v/NwcIO?style=flat-square&color=3B82F6&logo=nuget)](https://www.nuget.org/packages/NwcIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/NwcIO?style=flat-square&color=3B82F6)](https://github.com/IOExtend/NwcIO/releases) | `Azure Blue` `#3B82F6` |
+| **[IfcIO](https://github.com/IOExtend/IfcIO)** | `.ifc`, `.ifczip` | Pure managed ISO 10303-21 STEP engine for buildingSMART IFC2x3 & IFC4, tessellated geometry, glTF/OBJ export, 4D/5D schedules, IDS audit, clash detection, BCF 2.1 | [![Docs](https://img.shields.io/badge/Docs-Online-A855F7?style=flat-square&logo=github)](https://ioextend.github.io/IfcIO/) | [![NuGet](https://img.shields.io/nuget/v/IfcIO?style=flat-square&color=A855F7&logo=nuget)](https://www.nuget.org/packages/IfcIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/IfcIO?style=flat-square&color=A855F7)](https://github.com/IOExtend/IfcIO/releases) | `Electric Violet` `#A855F7` |
+| **[DwgIO](https://github.com/IOExtend/DwgIO)** | `.dwg` (AutoCAD R2004–R2018) | DWG version detection (R13–R2018), section container and decompression, drawing metadata and thumbnail, LINE/CIRCLE/ARC/POINT geometry, JSON export | [![Docs](https://img.shields.io/badge/Docs-Online-EF4444?style=flat-square&logo=github)](https://ioextend.github.io/DwgIO/) | [![NuGet](https://img.shields.io/nuget/v/DwgIO?style=flat-square&color=EF4444&logo=nuget)](https://www.nuget.org/packages/DwgIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/DwgIO?style=flat-square&color=EF4444)](https://github.com/IOExtend/DwgIO/releases) | `Signal Red` `#EF4444` |
+| **[IOViewer](https://github.com/IOExtend/IOViewer)** | `.glb`, `.obj`, JSON → `.html` | Standalone single-file WebGL/HTML viewer: ViewCube, section planes and section box, BIM property tree, measurement, 4D TimeLiner player, clash inspection | [![Docs](https://img.shields.io/badge/Docs-Online-3B82F6?style=flat-square&logo=github)](https://ioextend.github.io/IOViewer/) | [![NuGet](https://img.shields.io/nuget/v/IOViewer?style=flat-square&color=3B82F6&logo=nuget)](https://www.nuget.org/packages/IOViewer) | [![Release](https://img.shields.io/github/v/release/IOExtend/IOViewer?style=flat-square&color=3B82F6)](https://github.com/IOExtend/IOViewer/releases) | `Azure Blue` `#3B82F6` |
 
 ---
 
 ## Architectural Principles
 
 ```
-  ┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
-  │      RvtIO      │       │      NwcIO      │       │      IfcIO      │
-  │  Revit Engine   │       │Navisworks Engine│       │   IFC Engine    │
-  └────────┬────────┘       └────────┬────────┘       └────────┬────────┘
-           │                         │                         │
-           └─────────────────────────┼─────────────────────────┘
-                                     ▼
-                     ┌───────────────────────────────┐
-                     │   Pure Managed .NET 8 / 10    │
-                     │   Zero Native Dependencies    │
-                     │   Cross-Platform (Linux/Win)  │
-                     └───────────────────────────────┘
+┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐
+│   RvtIO   │ │   NwcIO   │ │   IfcIO   │ │   DwgIO   │ │ IOViewer  │
+│   Revit   │ │Navisworks │ │    IFC    │ │  AutoCAD  │ │WebGL/HTML │
+└─────┬─────┘ └─────┬─────┘ └─────┬─────┘ └─────┬─────┘ └─────┬─────┘
+      │             │             │             │             │
+      └─────────────┴─────────────┼─────────────┴─────────────┘
+                                  ▼
+                  ┌───────────────────────────────┐
+                  │   Pure Managed .NET 8 / 10    │
+                  │   Zero Native Dependencies    │
+                  │Cross-Platform: Win/Linux/macOS│
+                  └───────────────────────────────┘
 ```
 
 1. **100% Pure Managed .NET**:
    - Zero C/C++ native dynamic libraries (`.dll`, `.so`, `.dylib`).
    - Runs seamlessly inside minimal Alpine Linux Docker containers, AWS Lambda, Azure Functions, macOS ARM64/x64, and Windows.
 2. **Zero Proprietary SDK Dependencies**:
-   - Operates completely standalone without Autodesk Revit, Autodesk Navisworks, or closed-source license daemons.
+   - Operates completely standalone without Autodesk Revit, Autodesk Navisworks, AutoCAD, or closed-source license daemons.
 3. **Clean-Room Specification**:
    - All engines are authored from scratch using first-principles format analysis, official ISO/buildingSMART standards, and documented specifications.
    - Zero copyrighted code, zero decompiled source, and zero vendor header files.
@@ -66,36 +68,52 @@ IOExtend provides a unified suite of independent, zero-dependency .NET engines d
 
 ### Installation
 
-Install any of the packages via the .NET CLI:
+Install any of the libraries via the .NET CLI:
 
 ```bash
 # Autodesk Revit engine
 dotnet add package RvtIO
 
-# Autodesk Navisworks engine & CLI
+# Autodesk Navisworks engine
 dotnet add package NwcIO
-dotnet add package NwcIO.Cli
 
 # buildingSMART IFC engine
 dotnet add package IfcIO
+
+# Autodesk DWG engine
+dotnet add package DwgIO
+
+# Standalone WebGL/HTML viewer generator
+dotnet add package IOViewer
 ```
 
 ### Global CLI Tools
 
-All engines feature lightweight command-line utilities for CI/CD scripting:
+Every project ships a command-line tool for CI/CD scripting:
 
 ```bash
-# Install Navisworks CLI globally
+# Install the CLI tools globally
+dotnet tool install --global RvtIO.Cli
 dotnet tool install --global NwcIO.Cli
+dotnet tool install --global IfcIO.Cli
+dotnet tool install --global DwgIO.Cli
+dotnet tool install --global IOViewer.Cli
 
-# Inspect file metadata
-nwcio info model.nwc --report
+# Export a Revit project to IFC
+rvtio project.rvt project.ifc
 
-# Export to modern IFC4 and binary glTF
-nwcio export model.nwc --ifc4 building.ifc --glb scene.glb
+# Convert a Navisworks model to binary glTF and run clash detection with BCF output
+nwcio model.nwc model.glb
+nwcio clash arch.nwc mep.nwc --bcf clashes.bcfzip --tolerance 0.01
 
-# Multi-model clash detection
-nwcio clash campus_folder/ --report clashes.html --bcf issues.bcfzip
+# Inspect an IFC model
+ifcio info Building.ifc --report
+
+# Inspect a DWG drawing
+dwgio inspect drawing.dwg
+
+# Generate a standalone HTML viewer from a GLB model
+ioviewer model.glb -o viewer.html
 ```
 
 ---
