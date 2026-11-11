@@ -28,27 +28,51 @@ IOExtend provides a unified suite of independent, zero-dependency .NET engines a
 | **[RvtIO](https://github.com/IOExtend/RvtIO)** | `.rvt`, `.rfa` (Revit 2020–2026, 2027 partial) | Elements, parameters, geometry, file metadata and project information, `FilteredElementCollector` queries, IFC2X3 and JSON export | [![Docs](https://img.shields.io/badge/Docs-Online-F2A33A?style=flat-square&logo=github)](https://ioextend.github.io/RvtIO/) | [![NuGet](https://img.shields.io/nuget/v/RvtIO?style=flat-square&color=F2A33A&logo=nuget)](https://www.nuget.org/packages/RvtIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/RvtIO?style=flat-square&color=F2A33A)](https://github.com/IOExtend/RvtIO/releases) | `Amber` `#F2A33A` |
 | **[NwcIO](https://github.com/IOExtend/NwcIO)** | `.nwc`, `.nwd`, `.nwf` | Navisworks binary `LcUStream` parser, scene hierarchy and meshes, clash detection and clash matrix, BCF 2.1, 4D TimeLiner, IFC2X3/IFC4, glTF, OBJ, HTML and JSON export | [![Docs](https://img.shields.io/badge/Docs-Online-3B82F6?style=flat-square&logo=github)](https://ioextend.github.io/NwcIO/) | [![NuGet](https://img.shields.io/nuget/v/NwcIO?style=flat-square&color=3B82F6&logo=nuget)](https://www.nuget.org/packages/NwcIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/NwcIO?style=flat-square&color=3B82F6)](https://github.com/IOExtend/NwcIO/releases) | `Azure Blue` `#3B82F6` |
 | **[IfcIO](https://github.com/IOExtend/IfcIO)** | `.ifc`, `.ifczip` | Pure managed ISO 10303-21 STEP engine for buildingSMART IFC2x3 & IFC4, tessellated geometry, glTF/OBJ export, 4D/5D schedules, IDS audit, clash detection, BCF 2.1 | [![Docs](https://img.shields.io/badge/Docs-Online-A855F7?style=flat-square&logo=github)](https://ioextend.github.io/IfcIO/) | [![NuGet](https://img.shields.io/nuget/v/IfcIO?style=flat-square&color=A855F7&logo=nuget)](https://www.nuget.org/packages/IfcIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/IfcIO?style=flat-square&color=A855F7)](https://github.com/IOExtend/IfcIO/releases) | `Electric Violet` `#A855F7` |
-| **[DwgIO](https://github.com/IOExtend/DwgIO)** | `.dwg` (AutoCAD R2004–R2018) | DWG version detection (R13–R2018), section container and decompression, drawing metadata and thumbnail, LINE/CIRCLE/ARC/POINT geometry, JSON export | [![Docs](https://img.shields.io/badge/Docs-Online-EF4444?style=flat-square&logo=github)](https://ioextend.github.io/DwgIO/) | [![NuGet](https://img.shields.io/nuget/v/DwgIO?style=flat-square&color=EF4444&logo=nuget)](https://www.nuget.org/packages/DwgIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/DwgIO?style=flat-square&color=EF4444)](https://github.com/IOExtend/DwgIO/releases) | `Signal Red` `#EF4444` |
-| **[IOViewer](https://github.com/IOExtend/IOViewer)** | `.glb`, `.obj`, JSON → `.html` | Standalone single-file WebGL/HTML viewer: ViewCube, section planes and section box, BIM property tree, measurement, 4D TimeLiner player, clash inspection | [![Docs](https://img.shields.io/badge/Docs-Online-3B82F6?style=flat-square&logo=github)](https://ioextend.github.io/IOViewer/) | [![NuGet](https://img.shields.io/nuget/v/IOViewer?style=flat-square&color=3B82F6&logo=nuget)](https://www.nuget.org/packages/IOViewer) | [![Release](https://img.shields.io/github/v/release/IOExtend/IOViewer?style=flat-square&color=3B82F6)](https://github.com/IOExtend/IOViewer/releases) | `Azure Blue` `#3B82F6` |
+| **[DwgIO](https://github.com/IOExtend/DwgIO)** | `.dwg` (AutoCAD R2004–R2018) | DWG version detection (R13–R2018), section container and decompression, drawing metadata and thumbnail, LINE/CIRCLE/ARC/POINT geometry, JSON export | [![Docs](https://img.shields.io/badge/Docs-Online-38BDF8?style=flat-square&logo=github)](https://ioextend.github.io/DwgIO/) | [![NuGet](https://img.shields.io/nuget/v/DwgIO?style=flat-square&color=38BDF8&logo=nuget)](https://www.nuget.org/packages/DwgIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/DwgIO?style=flat-square&color=38BDF8)](https://github.com/IOExtend/DwgIO/releases) | `Sky Blue` `#38BDF8` |
+| **[IOViewer](https://github.com/IOExtend/IOViewer)** | `.glb`, `.obj`, JSON → `.html` | Standalone single-file WebGL/HTML viewer: ViewCube, section planes and section box, BIM property tree, measurement, 4D TimeLiner player, clash inspection | [![Docs](https://img.shields.io/badge/Docs-Online-06B6D4?style=flat-square&logo=github)](https://ioextend.github.io/IOViewer/) | [![NuGet](https://img.shields.io/nuget/v/IOViewer?style=flat-square&color=06B6D4&logo=nuget)](https://www.nuget.org/packages/IOViewer) | [![Release](https://img.shields.io/github/v/release/IOExtend/IOViewer?style=flat-square&color=06B6D4)](https://github.com/IOExtend/IOViewer/releases) | `Cyan` `#06B6D4` |
+
+### How the pieces fit together
+
+Each engine reads a native format and writes open formats that the other tools consume. For example, a Revit model can go `.rvt` → RvtIO → `.ifc` → IfcIO → `.glb` → IOViewer → `.html`.
+
+```mermaid
+flowchart LR
+  rvt[".rvt / .rfa"] --> RvtIO
+  nwc[".nwc / .nwd / .nwf"] --> NwcIO
+  dwg[".dwg"] --> DwgIO
+
+  RvtIO --> ifc[".ifc"]
+  NwcIO --> ifc
+  ifc --> IfcIO
+
+  NwcIO --> glb[".glb / .obj"]
+  IfcIO --> glb
+  glb --> IOViewer
+  IOViewer --> html[".html viewer"]
+
+  NwcIO --> bcf[".bcfzip (BCF 2.1)"]
+  IfcIO --> bcf
+
+  RvtIO --> json[".json"]
+  NwcIO --> json
+  IfcIO --> json
+  DwgIO --> json
+
+  classDef rvt stroke:#F2A33A,stroke-width:3px
+  classDef nwc stroke:#3B82F6,stroke-width:3px
+  classDef ifcio stroke:#A855F7,stroke-width:3px
+  classDef dwgio stroke:#38BDF8,stroke-width:3px
+  classDef viewer stroke:#06B6D4,stroke-width:3px
+  class RvtIO rvt
+  class NwcIO nwc
+  class IfcIO ifcio
+  class DwgIO dwgio
+  class IOViewer viewer
+```
 
 ---
 
 ## Architectural Principles
-
-```
-┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐
-│   RvtIO   │ │   NwcIO   │ │   IfcIO   │ │   DwgIO   │ │ IOViewer  │
-│   Revit   │ │Navisworks │ │    IFC    │ │  AutoCAD  │ │WebGL/HTML │
-└─────┬─────┘ └─────┬─────┘ └─────┬─────┘ └─────┬─────┘ └─────┬─────┘
-      │             │             │             │             │
-      └─────────────┴─────────────┼─────────────┴─────────────┘
-                                  ▼
-                  ┌───────────────────────────────┐
-                  │   Pure Managed .NET 8 / 10    │
-                  │   Zero Native Dependencies    │
-                  │Cross-Platform: Win/Linux/macOS│
-                  └───────────────────────────────┘
-```
 
 1. **100% Pure Managed .NET**:
    - Zero C/C++ native dynamic libraries (`.dll`, `.so`, `.dylib`).
