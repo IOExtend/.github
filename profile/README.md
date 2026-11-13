@@ -27,9 +27,9 @@ IOExtend is a set of independent .NET engines, each reading one family of BIM or
 
 | Project | Primary Formats | Key Capabilities | Documentation | NuGet | Release | Brand Palette |
 |:---|:---|:---|:---:|:---:|:---:|:---:|
-| **[RvtIO](https://github.com/IOExtend/RvtIO)** | `.rvt`, `.rfa` (Revit 2020–2026 tested, 2027 partial) | Elements, parameters, geometry, file metadata and project information, `FilteredElementCollector` queries, IFC2X3 and JSON export. Reads only; does not write Revit files | [![Docs](https://img.shields.io/badge/Docs-Online-F2A33A?style=flat-square&logo=github)](https://ioextend.github.io/RvtIO/) | [![NuGet](https://img.shields.io/nuget/v/RvtIO?style=flat-square&color=F2A33A&logo=nuget)](https://www.nuget.org/packages/RvtIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/RvtIO?style=flat-square&color=F2A33A)](https://github.com/IOExtend/RvtIO/releases) | `Amber` `#F2A33A` |
+| **[RvtIO](https://github.com/IOExtend/RvtIO)** | `.rvt`, `.rfa` (Revit 2020–2026 tested, 2027 partial) | Elements, parameters, geometry, file metadata and project information, `FilteredElementCollector` queries, IFC2X3 and JSON export; `RvtIO.Scene` turns a project into an IOScene scene. Reads only; does not write Revit files | [![Docs](https://img.shields.io/badge/Docs-Online-F2A33A?style=flat-square&logo=github)](https://ioextend.github.io/RvtIO/) | [![NuGet](https://img.shields.io/nuget/v/RvtIO?style=flat-square&color=F2A33A&logo=nuget)](https://www.nuget.org/packages/RvtIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/RvtIO?style=flat-square&color=F2A33A)](https://github.com/IOExtend/RvtIO/releases) | `Amber` `#F2A33A` |
 | **[NwcIO](https://github.com/IOExtend/NwcIO)** | `.nwc`, `.nwd`, `.nwf` (Navisworks 2016–2026 tested) | Scene hierarchy, meshes, materials, GUIDs and properties; viewpoints and redlines; JSON export; writes `.nwc`. *Frozen, bug fixes only:* IFC2X3/IFC4, glTF, OBJ and HTML export, clash detection, grouping and matrix, HTML clash report, BCF 2.1, measure, grids, revision diff, TimeLiner, selection and search sets, appearance profiler, mesh clipper, Navisworks XML | [![Docs](https://img.shields.io/badge/Docs-Online-3B82F6?style=flat-square&logo=github)](https://ioextend.github.io/NwcIO/) | [![NuGet](https://img.shields.io/nuget/v/NwcIO?style=flat-square&color=3B82F6&logo=nuget)](https://www.nuget.org/packages/NwcIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/NwcIO?style=flat-square&color=3B82F6)](https://github.com/IOExtend/NwcIO/releases) | `Azure Blue` `#3B82F6` |
-| **[IfcIO](https://github.com/IOExtend/IfcIO)** | `.ifc`, `.ifczip` | Reads and writes ISO 10303-21 STEP for buildingSMART IFC2x3 CV 2.0 and IFC4, spatial hierarchy, properties and meshes, `IfcApi` facade, 5D cost schedules, IDS 1.0 audit, JSON export. *Frozen, bug fixes only:* HTML viewer, glTF/OBJ export, clash, measure, grids, diff, BCF 2.1, 4D work-schedule logic | [![Docs](https://img.shields.io/badge/Docs-Online-A855F7?style=flat-square&logo=github)](https://ioextend.github.io/IfcIO/) | [![NuGet](https://img.shields.io/nuget/v/IfcIO?style=flat-square&color=A855F7&logo=nuget)](https://www.nuget.org/packages/IfcIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/IfcIO?style=flat-square&color=A855F7)](https://github.com/IOExtend/IfcIO/releases) | `Electric Violet` `#A855F7` |
+| **[IfcIO](https://github.com/IOExtend/IfcIO)** | `.ifc`, `.ifczip` | Reads and writes ISO 10303-21 STEP for buildingSMART IFC2x3 CV 2.0 and IFC4, spatial hierarchy, properties and meshes, `IfcApi` facade, 5D cost schedules, IDS 1.0 audit, JSON export; `IfcIO.Scene` converts a model into an IOScene scene. *Frozen, bug fixes only:* HTML viewer, glTF/OBJ export, clash, measure, grids, diff, BCF 2.1, 4D work-schedule logic | [![Docs](https://img.shields.io/badge/Docs-Online-A855F7?style=flat-square&logo=github)](https://ioextend.github.io/IfcIO/) | [![NuGet](https://img.shields.io/nuget/v/IfcIO?style=flat-square&color=A855F7&logo=nuget)](https://www.nuget.org/packages/IfcIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/IfcIO?style=flat-square&color=A855F7)](https://github.com/IOExtend/IfcIO/releases) | `Electric Violet` `#A855F7` |
 | **[DwgIO](https://github.com/IOExtend/DwgIO)** | `.dwg` (AutoCAD R2004, R2010, R2013, R2018) | Version detection (R13–R2018), section container and decompression, drawing metadata, thumbnail and handle map, LINE/CIRCLE/ARC/POINT geometry, JSON export. R13–R2000 and R2007 are planned | [![Docs](https://img.shields.io/badge/Docs-Online-38BDF8?style=flat-square&logo=github)](https://ioextend.github.io/DwgIO/) | [![NuGet](https://img.shields.io/nuget/v/DwgIO?style=flat-square&color=38BDF8&logo=nuget)](https://www.nuget.org/packages/DwgIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/DwgIO?style=flat-square&color=38BDF8)](https://github.com/IOExtend/DwgIO/releases) | `Sky Blue` `#38BDF8` |
 | **[PlaIO](https://github.com/IOExtend/PlaIO)** | `.pla`, `.pln` (Archicad 27, 29, 30), `.bimx` cover | File kind detection, container header, `BL`/`DY` block index, raw and zero-mask payload decoding, object directory search, BIMx PNG cover, text reports and directory JSON. Preview: elements, parameters and geometry are not read | [![Docs](https://img.shields.io/badge/Docs-Online-EC4899?style=flat-square&logo=github)](https://ioextend.github.io/PlaIO/) | [![NuGet](https://img.shields.io/nuget/v/PlaIO?style=flat-square&color=EC4899&logo=nuget)](https://www.nuget.org/packages/PlaIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/PlaIO?style=flat-square&color=EC4899)](https://github.com/IOExtend/PlaIO/releases) | `Pink` `#EC4899` |
 
@@ -37,8 +37,8 @@ IOExtend is a set of independent .NET engines, each reading one family of BIM or
 
 | Project | Primary Formats | Key Capabilities | Documentation | NuGet | Release | Brand Palette |
 |:---|:---|:---|:---:|:---:|:---:|:---:|
-| **[IOScene](https://github.com/IOExtend/IOScene)** | Scene `.json` (`"Kind": "ioscene"`) | Neutral scene model for tessellated BIM and CAD data: elements, instanced geometry, materials, typed properties, models, levels, grids, viewpoints, 4D schedules, clash results. Metres, right-handed, Z up. `SceneJson` reader/writer and `Validate()`. No dependencies. Preview: names may change before 0.1.0 | [![Docs](https://img.shields.io/badge/Docs-Contract-10B981?style=flat-square&logo=github)](https://github.com/IOExtend/IOScene/blob/main/docs/contract.md) | [![NuGet](https://img.shields.io/nuget/vpre/IOScene?style=flat-square&color=10B981&logo=nuget)](https://www.nuget.org/packages/IOScene) | [![Release](https://img.shields.io/github/v/release/IOExtend/IOScene?include_prereleases&style=flat-square&color=10B981)](https://github.com/IOExtend/IOScene/releases) | `Emerald` `#10B981` |
-| **[IOViewer](https://github.com/IOExtend/IOViewer)** | `.glb`, `.obj`, JSON → `.html` | One self-contained HTML file that works offline (three.js embedded): model tree and properties, view cube, up to six section planes or a section box, distance measurement, viewpoints and tour, clash results, 4D schedule player, Russian and English interface. Reads IOScene scene files from 0.3.0 (on `main`, not yet released) | [![Docs](https://img.shields.io/badge/Docs-Online-06B6D4?style=flat-square&logo=github)](https://ioextend.github.io/IOViewer/) | [![NuGet](https://img.shields.io/nuget/v/IOViewer?style=flat-square&color=06B6D4&logo=nuget)](https://www.nuget.org/packages/IOViewer) | [![Release](https://img.shields.io/github/v/release/IOExtend/IOViewer?style=flat-square&color=06B6D4)](https://github.com/IOExtend/IOViewer/releases) | `Cyan` `#06B6D4` |
+| **[IOScene](https://github.com/IOExtend/IOScene)** | Scene `.json` (`"Kind": "ioscene"`) | Neutral scene model for tessellated BIM and CAD data: elements, instanced geometry, materials, typed properties, models, levels, grids, viewpoints, 4D schedules, clash results. Metres, right-handed, Z up. `SceneJson` reader/writer and `Validate()`. No dependencies. Stable from 0.1.0: a patch adds or fixes, a breaking change waits for 0.2.0 | [![Docs](https://img.shields.io/badge/Docs-Contract-10B981?style=flat-square&logo=github)](https://github.com/IOExtend/IOScene/blob/main/docs/contract.md) | [![NuGet](https://img.shields.io/nuget/v/IOScene?style=flat-square&color=10B981&logo=nuget)](https://www.nuget.org/packages/IOScene) | [![Release](https://img.shields.io/github/v/release/IOExtend/IOScene?style=flat-square&color=10B981)](https://github.com/IOExtend/IOScene/releases) | `Emerald` `#10B981` |
+| **[IOViewer](https://github.com/IOExtend/IOViewer)** | `.glb`, `.obj`, JSON; `.ifc`, `.ifczip`, `.rvt` with the tool → `.html` | One self-contained HTML file that works offline (three.js embedded): model tree and properties, view cube, up to six section planes or a section box, distance measurement, viewpoints and tour, clash results, 4D schedule player, Russian and English interface. Built on IOScene from 0.3.0; the `ioviewer` tool reads IFC and Revit files through `IfcIO.Scene` and `RvtIO.Scene` | [![Docs](https://img.shields.io/badge/Docs-Online-06B6D4?style=flat-square&logo=github)](https://ioextend.github.io/IOViewer/) | [![NuGet](https://img.shields.io/nuget/v/IOViewer?style=flat-square&color=06B6D4&logo=nuget)](https://www.nuget.org/packages/IOViewer) | [![Release](https://img.shields.io/github/v/release/IOExtend/IOViewer?style=flat-square&color=06B6D4)](https://github.com/IOExtend/IOViewer/releases) | `Cyan` `#06B6D4` |
 
 ---
 
@@ -92,17 +92,17 @@ Solid arrows are code that exists; dashed arrows are planned. PlaIO has no scene
 
 | Piece | Status |
 |:---|:---|
-| IOScene | `0.1.0-preview.2` on NuGet; 0.1.0 is not released yet |
-| IfcIO.Scene, RvtIO.Scene | Merged ([IfcIO#36](https://github.com/IOExtend/IfcIO/pull/36), [RvtIO#198](https://github.com/IOExtend/RvtIO/pull/198)); not on NuGet yet, the first release needs IOScene 0.1.0 |
-| IOViewer on IOScene | Merged ([IOViewer#27](https://github.com/IOExtend/IOViewer/pull/27)) as `0.3.0-preview.1`, a breaking API change; not released, NuGet 0.2.0 still uses the older model |
-| `ioviewer` with `.ifc`, `.ifczip`, `.rvt` input | Draft ([IOViewer#28](https://github.com/IOExtend/IOViewer/pull/28)) |
+| IOScene | 0.1.0 on NuGet, the first stable release |
+| IfcIO.Scene, RvtIO.Scene | On NuGet with their engines: `IfcIO.Scene` 0.11.1 and `RvtIO.Scene` 0.4.0 (IfcIO 0.11.0 shipped without its adapter) |
+| IOViewer on IOScene | 0.3.0 on NuGet, a breaking API change from 0.2.0 |
+| `ioviewer` with `.ifc`, `.ifczip`, `.rvt` input | In `IOViewer.Cli` 0.3.0; an error of the engine gives exit code 4 after the output is written |
 | NwcIO.Scene, DwgIO.Scene | Planned |
 | IOScene.Formats | Planned: GLB/OBJ readers and a GLB writer over IOScene |
 | IOCoord | Planned: clash, measure, grids, diff, and BCF over IOScene |
 
-Until the adapters ship, the released tools can be chained, using IfcIO's frozen GLB export: `rvtio project.rvt project.ifc`, then `ifcio export project.ifc --glb scene.glb`, then `ioviewer scene.glb -o viewer.html`.
+A Revit or IFC model becomes a viewer in one step: `ioviewer project.rvt -o viewer.html` (or `model.ifc`).
 
-**Versioning.** In 0.x a patch release is additive and a minor release may break. A dependent references one IOScene line as `[0.N.0, 0.N+1.0-0)` (during the preview `[0.1.0-preview.2, 0.2.0-0)`), and an adapter pins its engine as `[X.Y.Z]`. Releases go in order: IOScene, then the engines with their adapters, then IOViewer.
+**Versioning.** In 0.x a patch release adds or fixes and a minor release may break. A dependent references one IOScene line as `[0.N.0, 0.N+1.0-0.0)` (nuget.org refuses the shorter bound `-0` in a dependency), and an adapter pins its engine as `[X.Y.Z]`. Releases go in order: IOScene, then the engines with their adapters, then IOViewer.
 
 ---
 
@@ -143,8 +143,12 @@ dotnet add package DwgIO
 # Archicad project container reader
 dotnet add package PlaIO
 
-# Neutral scene model (preview only so far)
-dotnet add package IOScene --prerelease
+# Neutral scene model
+dotnet add package IOScene
+
+# Scene adapters: an engine's model as an IOScene scene
+dotnet add package IfcIO.Scene
+dotnet add package RvtIO.Scene
 
 # Standalone WebGL/HTML viewer generator
 dotnet add package IOViewer
@@ -183,9 +187,10 @@ plaio info project.pln
 
 # Generate a standalone HTML viewer from a GLB model
 ioviewer model.glb -o viewer.html
-```
 
-Direct `.ifc`, `.ifczip`, and `.rvt` input for `ioviewer` is coming with the scene adapters ([IOViewer#28](https://github.com/IOExtend/IOViewer/pull/28), draft).
+# Or straight from a Revit or IFC model, read through RvtIO.Scene and IfcIO.Scene
+ioviewer project.rvt -o viewer.html
+```
 
 ---
 
