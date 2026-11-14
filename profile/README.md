@@ -39,7 +39,7 @@ IOExtend is a set of independent .NET engines, each reading one family of BIM or
 | Project | Primary Formats | Key Capabilities | Documentation | NuGet | Release | Brand Palette |
 |:---|:---|:---|:---:|:---:|:---:|:---:|
 | **[IOScene](https://github.com/IOExtend/IOScene)** | Scene `.json` (`"Kind": "ioscene"`) | Neutral scene model for tessellated BIM and CAD data: elements, instanced geometry, materials, typed properties, models, levels, grids, viewpoints, 4D schedules, clash results. Metres, right-handed, Z up. `SceneJson` reader/writer and `Validate()`. No dependencies. Stable from 0.1.0: a patch adds or fixes, a breaking change waits for 0.2.0 | [![Docs](https://img.shields.io/badge/Docs-Contract-10B981?style=flat-square&logo=github)](https://github.com/IOExtend/IOScene/blob/main/docs/contract.md) | [![NuGet](https://img.shields.io/nuget/v/IOScene?style=flat-square&color=10B981&logo=nuget)](https://www.nuget.org/packages/IOScene) | [![Release](https://img.shields.io/github/v/release/IOExtend/IOScene?style=flat-square&color=10B981)](https://github.com/IOExtend/IOScene/releases) | `Emerald` `#10B981` |
-| **[IOViewer](https://github.com/IOExtend/IOViewer)** | `.glb`, `.obj`, JSON; `.ifc`, `.ifczip`, `.rvt` with the tool → `.html` | One self-contained HTML file that works offline (three.js embedded): model tree and properties, view cube, up to six section planes or a section box, distance measurement, viewpoints and tour, clash results, 4D schedule player, Russian and English interface. Built on IOScene from 0.3.0; the `ioviewer` tool reads IFC and Revit files through `IfcIO.Scene` and `RvtIO.Scene`. It does not read `.nwc` files: a Navisworks model comes in as an IOScene scene `.json` written with `NwcIO.Scene` | [![Docs](https://img.shields.io/badge/Docs-Online-06B6D4?style=flat-square&logo=github)](https://ioextend.github.io/IOViewer/) | [![NuGet](https://img.shields.io/nuget/v/IOViewer?style=flat-square&color=06B6D4&logo=nuget)](https://www.nuget.org/packages/IOViewer) | [![Release](https://img.shields.io/github/v/release/IOExtend/IOViewer?style=flat-square&color=06B6D4)](https://github.com/IOExtend/IOViewer/releases) | `Cyan` `#06B6D4` |
+| **[IOViewer](https://github.com/IOExtend/IOViewer)** | `.glb`, `.obj`, JSON; `.ifc`, `.ifczip`, `.rvt` with the tool → `.html` | One self-contained HTML file that works offline (three.js embedded): model tree and properties, view cube, up to six section planes or a section box, distance measurement, viewpoints and tour, clash results, 4D schedule player, Russian and English interface. Built on IOScene from 0.3.0; the `ioviewer` tool reads IFC and Revit files through `IfcIO.Scene` and `RvtIO.Scene`. It does not read `.nwc` files: the tool takes a Navisworks model as an IOScene scene `.json` written with `NwcIO.Scene`, and the library takes the `SceneDocument` directly | [![Docs](https://img.shields.io/badge/Docs-Online-06B6D4?style=flat-square&logo=github)](https://ioextend.github.io/IOViewer/) | [![NuGet](https://img.shields.io/nuget/v/IOViewer?style=flat-square&color=06B6D4&logo=nuget)](https://www.nuget.org/packages/IOViewer) | [![Release](https://img.shields.io/github/v/release/IOExtend/IOViewer?style=flat-square&color=06B6D4)](https://github.com/IOExtend/IOViewer/releases) | `Cyan` `#06B6D4` |
 
 ---
 
@@ -95,15 +95,15 @@ flowchart LR
   class DwgIOScene,IOCoord planned
 ```
 
-Solid arrows are code that exists; dashed arrows are planned. PlaIO and TdbIO have no scene adapter.
+Solid arrows are released code; dashed arrows are planned. PlaIO has no scene adapter; a `TdbIO.Scene` adapter is on TdbIO's main branch and not released yet.
 
 | Piece | Status |
 |:---|:---|
 | IOScene | 0.1.1 on NuGet, a patch of 0.1.0, the first stable release |
 | IfcIO.Scene, RvtIO.Scene, NwcIO.Scene | On NuGet with their engines: `IfcIO.Scene` 0.11.1, `RvtIO.Scene` 0.4.0 and `NwcIO.Scene` 0.12.0 (IfcIO 0.11.0 shipped without its adapter) |
 | IOViewer on IOScene | 0.3.1 on NuGet; 0.3.0 was a breaking API change from 0.2.0 |
-| `ioviewer` with `.ifc`, `.ifczip`, `.rvt` input | In `IOViewer.Cli` from 0.3.0; an error of the engine gives exit code 4 after the output is written, and from 0.3.1 a `--serve` preview server that fails gives exit code 5 |
-| Navisworks models in IOViewer | Through an IOScene scene `.json` written with `NwcIO.Scene`; `ioviewer` does not read `.nwc` files |
+| `ioviewer` with `.ifc`, `.ifczip`, `.rvt` input | In `IOViewer.Cli` from 0.3.0; an error of the engine gives exit code 4 after the output is written. From 0.3.1, a `--serve` preview server that cannot start or fails gives exit code 5, whatever the input |
+| Navisworks models in IOViewer | The library takes the `SceneDocument` from `NwcIO.Scene`; the `ioviewer` tool takes it as an IOScene scene `.json` and does not read `.nwc` files yet |
 | DwgIO.Scene | Planned |
 | IOScene.Formats | Planned: GLB/OBJ readers and a GLB writer over IOScene |
 | IOCoord | Planned: clash, measure, grids, diff, and BCF over IOScene |
@@ -125,7 +125,7 @@ A Revit or IFC model becomes a viewer in one step: `ioviewer project.rvt -o view
    - Written independently from format analysis, ISO/buildingSMART standards, and documented specifications.
    - No decompiled or leaked source, no vendor headers or SDKs. The few open-source components, such as OpenMcdf and SharpZipLib in RvtIO and three.js in IOViewer pages, are listed in that repository's `THIRD-PARTY-NOTICES.md`.
 4. **Stated Scope**:
-   - Each README states the tested version range and what is not read or written; IfcIO and NwcIO also list their frozen features.
+   - Each README states what is not read or written, and the tested version range where one is known (TdbIO lists its tested Tekla versions in `docs/versions.md`); IfcIO and NwcIO also list their frozen features.
 
 ---
 
