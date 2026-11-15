@@ -100,7 +100,7 @@ Solid arrows are released code; dashed arrows are planned. PlaIO has no scene ad
 | Piece | Status |
 |:---|:---|
 | IOScene | 0.1.1 on NuGet, a patch of 0.1.0, the first stable release |
-| IfcIO.Scene, RvtIO.Scene, NwcIO.Scene | On NuGet with their engines: `IfcIO.Scene` 0.11.1, `RvtIO.Scene` 0.4.0 and `NwcIO.Scene` 0.12.0 (IfcIO 0.11.0 shipped without its adapter) |
+| IfcIO.Scene, RvtIO.Scene, NwcIO.Scene | On NuGet with their engines: `IfcIO.Scene` 0.11.1, `RvtIO.Scene` 0.4.0 and `NwcIO.Scene` 0.12.1 (IfcIO 0.11.0 shipped without its adapter) |
 | IOViewer on IOScene | 0.3.1 on NuGet; 0.3.0 was a breaking API change from 0.2.0 |
 | `ioviewer` with `.ifc`, `.ifczip`, `.rvt` input | In `IOViewer.Cli` from 0.3.0; an error of the engine gives exit code 4 after the output is written. From 0.3.1, a `--serve` preview server that cannot start or fails gives exit code 5, whatever the input |
 | Navisworks models in IOViewer | The library takes the `SceneDocument` from `NwcIO.Scene`; the `ioviewer` tool takes it as an IOScene scene `.json` and does not read `.nwc` files yet |
