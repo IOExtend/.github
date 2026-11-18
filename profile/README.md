@@ -6,7 +6,7 @@
 
 **Pure managed .NET libraries and cross-platform CLI tools for BIM and CAD interoperability.**
 
-*Read, inspect, and convert building models and drawings without the authoring software, its API, or native libraries installed.*
+*Read, inspect, and convert building models and drawings without the authoring software, its API, or additional native libraries installed.*
 
 ---
 
@@ -21,14 +21,14 @@
 
 ## The Ecosystem
 
-IOExtend is a set of independent .NET engines, each reading one family of BIM or CAD formats, plus a neutral scene model and a standalone HTML viewer. Everything is managed code without native libraries, for use in CI/CD pipelines, web backends, and desktop engineering software.
+IOExtend is a set of independent .NET engines, each reading one family of BIM or CAD formats, plus a neutral scene model and a standalone HTML viewer. The engines use managed code without additional native libraries, for use in CI/CD pipelines, web backends, and desktop engineering software.
 
 ### Engines
 
 | Project | Primary Formats | Key Capabilities | Documentation | NuGet | Release | Brand Palette |
 |:---|:---|:---|:---:|:---:|:---:|:---:|
-| **[RvtIO](https://github.com/IOExtend/RvtIO)** | `.rvt`, `.rfa` (Revit 2020–2026 tested, 2027 partial) | Elements, parameters, geometry, file metadata and project information, `FilteredElementCollector` queries, triangle meshes with one shared mesh per family symbol (`ElementMeshes`), IFC2X3 and JSON export; `RvtIO.Scene` turns a project into an IOScene scene. Reads only; does not write Revit files | [![Docs](https://img.shields.io/badge/Docs-Online-F2A33A?style=flat-square&logo=github)](https://ioextend.github.io/RvtIO/) | [![NuGet](https://img.shields.io/nuget/v/RvtIO?style=flat-square&color=F2A33A&logo=nuget)](https://www.nuget.org/packages/RvtIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/RvtIO?style=flat-square&color=F2A33A)](https://github.com/IOExtend/RvtIO/releases) | `Amber` `#F2A33A` |
-| **[NwcIO](https://github.com/IOExtend/NwcIO)** | `.nwc`, `.nwd`, `.nwf` (Navisworks 2016–2026 tested) | Scene hierarchy, meshes, materials decoded from the file, element GUIDs and IFC GlobalIds, property tabs and properties; viewpoints and redlines; JSON export; writes `.nwc`; `NwcIO.Scene` turns a model file into an IOScene scene in metres with element GUIDs, IFC GlobalIds, property tabs and file materials. Scene trees with partition nodes (`.nwd`) and linked Revit models are not decoded. *Frozen, bug fixes only:* IFC2X3/IFC4, glTF, OBJ and HTML export, clash detection, grouping and matrix, HTML clash report, BCF 2.1, measure, grids, revision diff, TimeLiner, selection and search sets, appearance profiler, mesh clipper, Navisworks XML | [![Docs](https://img.shields.io/badge/Docs-Online-3B82F6?style=flat-square&logo=github)](https://ioextend.github.io/NwcIO/) | [![NuGet](https://img.shields.io/nuget/v/NwcIO?style=flat-square&color=3B82F6&logo=nuget)](https://www.nuget.org/packages/NwcIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/NwcIO?style=flat-square&color=3B82F6)](https://github.com/IOExtend/NwcIO/releases) | `Azure Blue` `#3B82F6` |
+| **[RvtIO](https://github.com/IOExtend/RvtIO)** | `.rvt`, `.rfa` (Revit 2020–2026 tested, 2027 partial) | Elements, parameters, geometry, file metadata and project information, `FilteredElementCollector` queries, triangle meshes with one shared mesh per family symbol (`ElementMeshes`), IFC2X3 and JSON export; `RvtIO.Scene` turns a project into an IOScene scene. The main branch also has PDF printing and limited RVT/RFA save-as and record rewriting for local non-workshared files | [![Docs](https://img.shields.io/badge/Docs-Online-F2A33A?style=flat-square&logo=github)](https://ioextend.github.io/RvtIO/) | [![NuGet](https://img.shields.io/nuget/v/RvtIO?style=flat-square&color=F2A33A&logo=nuget)](https://www.nuget.org/packages/RvtIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/RvtIO?style=flat-square&color=F2A33A)](https://github.com/IOExtend/RvtIO/releases) | `Amber` `#F2A33A` |
+| **[NwcIO](https://github.com/IOExtend/NwcIO)** | `.nwc`, `.nwd`, `.nwf` (Navisworks 2016–2026 tested) | Scene hierarchy, meshes, materials decoded from the file, element GUIDs and IFC GlobalIds, property tabs and properties; viewpoints and redlines; JSON export; writes `.nwc` in a layout tested with NwcIO. Opening these files in Autodesk Navisworks remains unverified; `NwcIO.Scene` turns a model file into an IOScene scene in metres with element GUIDs, IFC GlobalIds, property tabs and file materials. The main branch also decodes scene trees with partition nodes (`.nwd`) and linked Revit placements. *Frozen, bug fixes only:* IFC2X3/IFC4, glTF, OBJ and HTML export, clash detection, grouping and matrix, HTML clash report, BCF 2.1, measure, grids, revision diff, TimeLiner, selection and search sets, appearance profiler, mesh clipper, Navisworks XML | [![Docs](https://img.shields.io/badge/Docs-Online-3B82F6?style=flat-square&logo=github)](https://ioextend.github.io/NwcIO/) | [![NuGet](https://img.shields.io/nuget/v/NwcIO?style=flat-square&color=3B82F6&logo=nuget)](https://www.nuget.org/packages/NwcIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/NwcIO?style=flat-square&color=3B82F6)](https://github.com/IOExtend/NwcIO/releases) | `Azure Blue` `#3B82F6` |
 | **[IfcIO](https://github.com/IOExtend/IfcIO)** | `.ifc`, `.ifczip` | Reads and writes ISO 10303-21 STEP for buildingSMART IFC2x3 CV 2.0 and IFC4, spatial hierarchy, properties and meshes, `IfcApi` facade, 5D cost schedules, IDS 1.0 audit, JSON export; `IfcIO.Scene` converts a model into an IOScene scene. *Frozen, bug fixes only:* HTML viewer, glTF/OBJ export, clash, measure, grids, diff, BCF 2.1, 4D work-schedule logic | [![Docs](https://img.shields.io/badge/Docs-Online-A855F7?style=flat-square&logo=github)](https://ioextend.github.io/IfcIO/) | [![NuGet](https://img.shields.io/nuget/v/IfcIO?style=flat-square&color=A855F7&logo=nuget)](https://www.nuget.org/packages/IfcIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/IfcIO?style=flat-square&color=A855F7)](https://github.com/IOExtend/IfcIO/releases) | `Electric Violet` `#A855F7` |
 | **[DwgIO](https://github.com/IOExtend/DwgIO)** | `.dwg` (AutoCAD R2004, R2010, R2013, R2018) | Version detection (R13–R2018), section container and decompression, drawing metadata, thumbnail and handle map, LINE/CIRCLE/ARC/POINT geometry, JSON export. R13–R2000 and R2007 are planned | [![Docs](https://img.shields.io/badge/Docs-Online-38BDF8?style=flat-square&logo=github)](https://ioextend.github.io/DwgIO/) | [![NuGet](https://img.shields.io/nuget/v/DwgIO?style=flat-square&color=38BDF8&logo=nuget)](https://www.nuget.org/packages/DwgIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/DwgIO?style=flat-square&color=38BDF8)](https://github.com/IOExtend/DwgIO/releases) | `Sky Blue` `#38BDF8` |
 | **[PlaIO](https://github.com/IOExtend/PlaIO)** | `.pla`, `.pln` (Archicad 27, 29, 30), `.bimx` cover | File kind detection, container header, `BL`/`DY` block index, raw and zero-mask payload decoding, object directory search, BIMx PNG cover, text reports and directory JSON. Preview: elements, parameters and geometry are not read | [![Docs](https://img.shields.io/badge/Docs-Online-EC4899?style=flat-square&logo=github)](https://ioextend.github.io/PlaIO/) | [![NuGet](https://img.shields.io/nuget/v/PlaIO?style=flat-square&color=EC4899&logo=nuget)](https://www.nuget.org/packages/PlaIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/PlaIO?style=flat-square&color=EC4899)](https://github.com/IOExtend/PlaIO/releases) | `Pink` `#EC4899` |
@@ -46,10 +46,12 @@ IOExtend is a set of independent .NET engines, each reading one family of BIM or
 ## Architecture
 
 - **Engines are leaves.** RvtIO, NwcIO, IfcIO, DwgIO, PlaIO, and TdbIO each read their own format, and some also write it. No engine references another IOExtend package or a scene type.
+- **Keep native decoding in the engine.** The engine owns container I/O, format models and the geometry decoded from the file. New target-format exports, generic presentation and coordination use optional packages or tools.
 - **IOScene is the neutral contract.** A scene holds what a viewer or coordination tool shows, filters, measures, or tests. It is not an authoring model, and no source file is rebuilt from it.
 - **Adapters live with their engine.** `<Engine>.Scene` turns an engine's model into an IOScene `SceneDocument`. It ships on the engine's version and tag, depends on exactly that engine version, and uses only the engine's public API.
 - **Consumers depend on IOScene only.** From 0.3.0 the IOViewer library references IOScene and no engine. Only command line tools combine several adapters.
 - **Frozen extras.** Viewer, export, and coordination features inside IfcIO and NwcIO get bug fixes only. They stay available and are removed no earlier than that engine's 1.0, and only after a published replacement exists.
+- **Preserve existing consumers during extraction.** Keep public library and CLI entry points compatible. Compare the old and new outputs on the same inputs, check package compatibility, and verify adapter consumers before switching them to a replacement.
 
 ```mermaid
 flowchart LR
@@ -100,7 +102,7 @@ Solid arrows are released code; dashed arrows are planned. PlaIO has no scene ad
 | Piece | Status |
 |:---|:---|
 | IOScene | 0.1.1 on NuGet, a patch of 0.1.0, the first stable release |
-| IfcIO.Scene, RvtIO.Scene, NwcIO.Scene | On NuGet with their engines: `IfcIO.Scene` 0.11.1, `RvtIO.Scene` 0.4.0 and `NwcIO.Scene` 0.12.1 (IfcIO 0.11.0 shipped without its adapter) |
+| IfcIO.Scene, RvtIO.Scene, NwcIO.Scene | On NuGet with their engines: `IfcIO.Scene` 0.11.1, `RvtIO.Scene` 0.4.0 and `NwcIO.Scene` 0.13.0 |
 | IOViewer on IOScene | 0.3.1 on NuGet; 0.3.0 was a breaking API change from 0.2.0 |
 | `ioviewer` with `.ifc`, `.ifczip`, `.rvt` input | In `IOViewer.Cli` from 0.3.0; an error of the engine gives exit code 4 after the output is written. From 0.3.1, a `--serve` preview server that cannot start or fails gives exit code 5, whatever the input |
 | Navisworks models in IOViewer | The library takes the `SceneDocument` from `NwcIO.Scene`; the `ioviewer` tool takes it as an IOScene scene `.json` and does not read `.nwc` files yet |
@@ -108,7 +110,7 @@ Solid arrows are released code; dashed arrows are planned. PlaIO has no scene ad
 | IOScene.Formats | Planned: GLB/OBJ readers and a GLB writer over IOScene |
 | IOCoord | Planned: clash, measure, grids, diff, and BCF over IOScene |
 
-A Revit or IFC model becomes a viewer in one step: `ioviewer project.rvt -o viewer.html` (or `model.ifc`). A Navisworks model takes two: `NwcSceneReader.Read` and `SceneJson.Save` write a scene file in code, and `ioviewer model.scene.json -o viewer.html` turns it into a page.
+A Revit or IFC model becomes a viewer in one step: `ioviewer project.rvt -o viewer.html` (or `model.ifc`). For a Navisworks cache, run `nwcio model.nwc --scene model.scene.json` with NwcIO.Cli 0.13.0 or later, then `ioviewer model.scene.json -o viewer.html`.
 
 **Versioning.** In 0.x a patch release adds or fixes and a minor release may break. A dependent references one IOScene line as `[0.N.0, 0.N+1.0-0.0)` (nuget.org refuses the shorter bound `-0` in a dependency), and an adapter pins its engine as `[X.Y.Z]`. Releases go in order: IOScene, then the engines with their adapters, then IOViewer.
 
@@ -117,7 +119,7 @@ A Revit or IFC model becomes a viewer in one step: `ioviewer project.rvt -o view
 ## Architectural Principles
 
 1. **Pure Managed .NET**:
-   - No C/C++ native libraries (`.dll`, `.so`, `.dylib`).
+   - No bundled or separately installed native libraries. RvtIO uses operating-system APIs to identify file aliases such as hard links.
    - Targets .NET 8 and .NET 10; the engine and viewer READMEs list Windows, Linux, and macOS as supported, except TdbIO's, which states that it uses no Windows-only APIs and whose CI runs on all three.
 2. **No Proprietary SDK Dependencies**:
    - Works without Autodesk Revit, Autodesk Navisworks, AutoCAD, Archicad, Tekla Structures, or their APIs.
