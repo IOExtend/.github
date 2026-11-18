@@ -73,7 +73,8 @@ flowchart LR
   DwgIOScene -.-> IOScene
 
   IOScene --> IOViewer["IOViewer + ioviewer CLI"]
-  IOScene -.-> IOCoord["IOCoord (planned)"]
+  IOScene -.-> IOCoord["IOCoord (preview)"]
+  IOScene -.-> IOSceneFormats["IOScene.Formats (preview)"]
   files[".glb / .obj / scene .json"] ---> IOViewer
   IOViewer --> html[".html viewer"]
 
@@ -94,10 +95,10 @@ flowchart LR
   class TdbIO tdbio
   class IOViewer viewer
   class IOScene scene
-  class DwgIOScene,IOCoord planned
+  class DwgIOScene,IOCoord,IOSceneFormats planned
 ```
 
-Solid arrows are released code; dashed arrows are planned. PlaIO has no scene adapter; a `TdbIO.Scene` adapter is on TdbIO's main branch and not released yet.
+Solid arrows show released code. Dashed arrows show work in development. PlaIO has no scene adapter. The `TdbIO.Scene` adapter is on TdbIO's main branch awaiting release.
 
 | Piece | Status |
 |:---|:---|
@@ -107,8 +108,8 @@ Solid arrows are released code; dashed arrows are planned. PlaIO has no scene ad
 | `ioviewer` with `.ifc`, `.ifczip`, `.rvt` input | In `IOViewer.Cli` from 0.3.0; an error of the engine gives exit code 4 after the output is written. From 0.3.1, a `--serve` preview server that cannot start or fails gives exit code 5, whatever the input |
 | Navisworks models in IOViewer | The library takes the `SceneDocument` from `NwcIO.Scene`; the `ioviewer` tool takes it as an IOScene scene `.json` and does not read `.nwc` files yet |
 | DwgIO.Scene | Planned |
-| IOScene.Formats | Planned: GLB/OBJ readers and a GLB writer over IOScene |
-| IOCoord | Planned: clash, measure, grids, diff, and BCF over IOScene |
+| IOScene.Formats | [Source preview](https://github.com/IOExtend/IOScene/blob/main/docs/tools.md#glb-and-obj) with GLB/OBJ readers and a GLB writer. Available from a local build |
+| IOCoord | [Source preview](https://github.com/IOExtend/IOScene/blob/main/docs/tools.md#clash-checks-revision-comparison-grids-and-bcf) with surface intersection, measurement, grids, revision comparison and BCF 2.1 export. Available from a local build |
 
 A Revit or IFC model becomes a viewer in one step: `ioviewer project.rvt -o viewer.html` (or `model.ifc`). For a Navisworks cache, run `nwcio model.nwc --scene model.scene.json` with NwcIO.Cli 0.13.0 or later, then `ioviewer model.scene.json -o viewer.html`.
 
