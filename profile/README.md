@@ -33,6 +33,7 @@ IOExtend is a set of independent .NET engines, each reading one family of BIM or
 | **[DwgIO](https://github.com/IOExtend/DwgIO)** | `.dwg` (AutoCAD R2004, R2010, R2013, R2018) | Version detection (R13–R2018), section container and decompression, drawing metadata, thumbnail and handle map, LINE/CIRCLE/ARC/POINT geometry, JSON export. R13–R2000 and R2007 are planned | [![Docs](https://img.shields.io/badge/Docs-Online-38BDF8?style=flat-square&logo=github)](https://ioextend.github.io/DwgIO/) | [![NuGet](https://img.shields.io/nuget/v/DwgIO?style=flat-square&color=38BDF8&logo=nuget)](https://www.nuget.org/packages/DwgIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/DwgIO?style=flat-square&color=38BDF8)](https://github.com/IOExtend/DwgIO/releases) | `Sky Blue` `#38BDF8` |
 | **[PlaIO](https://github.com/IOExtend/PlaIO)** | `.pla`, `.pln` (Archicad 27, 29, 30), `.bimx` cover | File kind detection, container header, `BL`/`DY` block index, raw and zero-mask payload decoding, object directory search, BIMx PNG cover, text reports and directory JSON. Preview: elements, parameters and geometry are not read | [![Docs](https://img.shields.io/badge/Docs-Online-EC4899?style=flat-square&logo=github)](https://ioextend.github.io/PlaIO/) | [![NuGet](https://img.shields.io/nuget/v/PlaIO?style=flat-square&color=EC4899&logo=nuget)](https://www.nuget.org/packages/PlaIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/PlaIO?style=flat-square&color=EC4899)](https://github.com/IOExtend/PlaIO/releases) | `Pink` `#EC4899` |
 | **[TdbIO](https://github.com/IOExtend/TdbIO)** | `.db1`, `.db2`, DBV@, `.nc1`, `.tpl`, `.rpt`, `.xsr` (Tekla Structures) | Kind detection from the content, gzip unpacking with size and CRC-32 checks, model database header, id map, text chains and save dates, table sections walked to the last byte with rows as raw bytes, id range and GUID map files, DSTV NC parts, template block trees, report pages, text or JSON output. Preview: rows are not decoded into parts, assemblies or other model objects, drawing files are only recognised, and nothing is written | [![Docs](https://img.shields.io/badge/Docs-Online-22C55E?style=flat-square&logo=github)](https://ioextend.github.io/TdbIO/) | [![NuGet](https://img.shields.io/nuget/v/TdbIO?style=flat-square&color=22C55E&logo=nuget)](https://www.nuget.org/packages/TdbIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/TdbIO?style=flat-square&color=22C55E)](https://github.com/IOExtend/TdbIO/releases) | `Green` `#22C55E` |
+| **[PclIO](https://github.com/IOExtend/PclIO)** | Point clouds: `.e57`, `.rcp`/`.rcs`, `.lgsx`/`.lgs`, `.ptg`, `.fls`, `.srf`, `.c3db`, `.las`/`.laz`/`.copc.laz`, `.pcd`, `.ply`, `.pts`, `.ptx`, `.xyz`, `.sbf`, `.pnts`, Potree, EPT, `.bin` (CCB2) | Content-based format detection, scans with bounds, transforms and metadata, streaming point reads with a limit and a subsampling step, LAS 1.2/1.4, XYZ, PTS and JSON export, `pclio` CLI. `PclIO.Scene` turns a cloud into an IOScene scene in metres: one element per scan, point geometry with normals, scan properties as text; it awaits its first release | [![Docs](https://img.shields.io/badge/Docs-Online-2DD4BF?style=flat-square&logo=github)](https://ioextend.github.io/PclIO/) | [![NuGet](https://img.shields.io/nuget/v/PclIO?style=flat-square&color=2DD4BF&logo=nuget)](https://www.nuget.org/packages/PclIO) | [![Release](https://img.shields.io/github/v/release/IOExtend/PclIO?style=flat-square&color=2DD4BF)](https://github.com/IOExtend/PclIO/releases) | `Teal` `#2DD4BF` |
 
 ### Scene model and viewer
 
@@ -45,7 +46,7 @@ IOExtend is a set of independent .NET engines, each reading one family of BIM or
 
 ## Architecture
 
-- **Engines are leaves.** RvtIO, NwcIO, IfcIO, DwgIO, PlaIO, and TdbIO each read their own format, and some also write it. No engine references another IOExtend package or a scene type.
+- **Engines are leaves.** RvtIO, NwcIO, IfcIO, DwgIO, PlaIO, TdbIO, and PclIO each read their own format, and some also write it. No engine references another IOExtend package or a scene type.
 - **Keep native decoding in the engine.** The engine owns container I/O, format models and the geometry decoded from the file. New target-format exports, generic presentation and coordination use optional packages or tools.
 - **IOScene is the neutral contract.** A scene holds what a viewer or coordination tool shows, filters, measures, or tests. It is not an authoring model, and no source file is rebuilt from it.
 - **Adapters live with their engine.** `<Engine>.Scene` turns an engine's model into an IOScene `SceneDocument`. It ships on the engine's version and tag, depends on exactly that engine version, and uses only the engine's public API.
@@ -61,16 +62,19 @@ flowchart LR
   dwg[".dwg"] --> DwgIO
   pla[".pla / .pln / .bimx"] --> PlaIO
   tdb[".db1 / .db2 / .nc1 / .tpl"] --> TdbIO
+  pcl[".e57 / .rcs / .las / .ptg / ..."] --> PclIO
 
   IfcIO --> IfcIOScene["IfcIO.Scene"]
   RvtIO --> RvtIOScene["RvtIO.Scene"]
   NwcIO --> NwcIOScene["NwcIO.Scene"]
   DwgIO -.-> DwgIOScene["DwgIO.Scene (planned)"]
+  PclIO -.-> PclIOScene["PclIO.Scene (awaiting release)"]
 
   IfcIOScene --> IOScene["IOScene<br/>scene model + JSON"]
   RvtIOScene --> IOScene
   NwcIOScene --> IOScene
   DwgIOScene -.-> IOScene
+  PclIOScene -.-> IOScene
 
   IOScene --> IOViewer["IOViewer + ioviewer CLI"]
   IOScene -.-> IOCoord["IOCoord (preview)"]
@@ -84,6 +88,7 @@ flowchart LR
   classDef dwgio stroke:#38BDF8,stroke-width:3px
   classDef plaio stroke:#EC4899,stroke-width:3px
   classDef tdbio stroke:#22C55E,stroke-width:3px
+  classDef pclio stroke:#2DD4BF,stroke-width:3px
   classDef viewer stroke:#06B6D4,stroke-width:3px
   classDef scene stroke:#10B981,stroke-width:3px
   classDef planned stroke-dasharray: 5 5
@@ -93,17 +98,19 @@ flowchart LR
   class DwgIO dwgio
   class PlaIO plaio
   class TdbIO tdbio
+  class PclIO pclio
   class IOViewer viewer
   class IOScene scene
-  class DwgIOScene,IOCoord,IOSceneFormats planned
+  class DwgIOScene,PclIOScene,IOCoord,IOSceneFormats planned
 ```
 
-Arrows show data flow. Solid arrows show released code. Dashed arrows mark preview or planned integrations. `IOCoord` and `IOScene.Formats` are optional packages in the IOScene repository. Each depends on IOScene, whose scene contract can be installed independently. PlaIO has no scene adapter. The `TdbIO.Scene` adapter is on TdbIO's main branch awaiting release.
+Arrows show data flow. Solid arrows show released code. Dashed arrows mark preview or planned integrations. `IOCoord` and `IOScene.Formats` are optional packages in the IOScene repository. Each depends on IOScene, whose scene contract can be installed independently. PlaIO has no scene adapter. The `TdbIO.Scene` adapter is on TdbIO's main branch awaiting release. The `PclIO.Scene` adapter is in review on PclIO and ships with the engine's next release.
 
 | Piece | Status |
 |:---|:---|
-| IOScene | 0.1.1 on NuGet, a patch of 0.1.0, the first stable release |
+| IOScene | 0.1.2 on NuGet, a patch line of 0.1.0, the first stable release |
 | IfcIO.Scene, RvtIO.Scene, NwcIO.Scene | On NuGet with their engines: `IfcIO.Scene` 0.11.1, `RvtIO.Scene` 0.4.0 and `NwcIO.Scene` 0.13.0 |
+| PclIO.Scene | In review on PclIO: one element per scan, point geometry in metres, scan properties as text; ships with the engine's next release |
 | IOViewer on IOScene | 0.3.1 on NuGet; 0.3.0 was a breaking API change from 0.2.0 |
 | `ioviewer` with `.ifc`, `.ifczip`, `.rvt` input | In `IOViewer.Cli` from 0.3.0; an error of the engine gives exit code 4 after the output is written. From 0.3.1, a `--serve` preview server that cannot start or fails gives exit code 5, whatever the input |
 | Navisworks models in IOViewer | The library takes the `SceneDocument` from `NwcIO.Scene`; the `ioviewer` tool takes it as an IOScene scene `.json` and does not read `.nwc` files yet |
@@ -157,6 +164,9 @@ dotnet add package PlaIO
 # Tekla Structures file reader
 dotnet add package TdbIO
 
+# Point cloud engine
+dotnet add package PclIO
+
 # Neutral scene model
 dotnet add package IOScene
 
@@ -181,6 +191,7 @@ dotnet tool install --global IfcIO.Cli
 dotnet tool install --global DwgIO.Cli
 dotnet tool install --global PlaIO.Cli
 dotnet tool install --global TdbIO.Cli
+dotnet tool install --global PclIO.Cli
 dotnet tool install --global IOViewer.Cli
 
 # Export a Revit project to IFC
@@ -204,6 +215,10 @@ plaio info project.pln
 # Inspect a Tekla Structures model database
 tdbio info model.db1
 
+# Inspect a point cloud and export a decimated XYZ
+pclio info scan.e57
+pclio export scan.e57 scan.xyz --step 10
+
 # Generate a standalone HTML viewer from a GLB model
 ioviewer model.glb -o viewer.html
 
@@ -217,7 +232,7 @@ ioviewer project.rvt -o viewer.html
 
 - All repositories in the **IOExtend** organization follow a clean-room policy.
 - Repositories contain **no confidential customer models, vendor files, or proprietary binaries**.
-- Tests that need real model files (RvtIO, NwcIO, DwgIO, PlaIO, TdbIO) read them from a local folder named by a `*_TEST_FILES` environment variable. CI does not set it, so those tests are skipped there.
+- Tests that need real model files (RvtIO, NwcIO, DwgIO, PlaIO, TdbIO, PclIO) read them from a local folder named by a `*_TEST_FILES` environment variable. CI does not set it, so those tests are skipped there.
 - Every public code repository has a `SECURITY.md`. Report vulnerabilities through GitHub private vulnerability reporting (the repository's **Security** tab, **Report a vulnerability**). Please do not open a public issue for a security problem.
 
 ---
