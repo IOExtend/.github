@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PublishTrimmed>false</PublishTrimmed>
+    <WasmBuildNative>false</WasmBuildNative>
+    <!-- CLI references run as assemblies inside the browser runtime. -->
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IOExtendLargeExportHeap)' == 'true' and '$(DowngradeSource)' == ''">
+    <TargetFramework>net11.0</TargetFramework>
+    <WasmBuildNative>true</WasmBuildNative>
+    <EmccMaximumHeapSize>4294901760</EmccMaximumHeapSize>
+    <EmccExtraLDFlags>$(EmccExtraLDFlags) -sMALLOC=dlmalloc</EmccExtraLDFlags>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(DowngradeSource)' == ''">
+    <DefineConstants>$(DefineConstants);MODEL_EXPORT</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(DowngradeSource)' != ''">
+    <ProjectReference Include="$(DowngradeSource)/src/RvtIO.Cli/RvtIO.Cli.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(DowngradeSource)' == ''">
+    <ProjectReference Include="$(RvtIOProgressSource)/src/RvtIO.Cli/RvtIO.Cli.csproj" />
+    <ProjectReference Include="$(RvtIOProgressSource)/tools/RvtIO.Nwc/RvtIO.Nwc.csproj" />
+    <ProjectReference Include="$(NwcIOSource)/src/NwcIO.Cli/NwcIO.Cli.csproj" />
+    <PackageReference Include="IOScene.Formats" Version="0.1.0-preview.1" />
+    <PackageReference Include="IOViewer" Version="0.3.1" Condition="'$(IOViewerSource)' == ''" />
+    <ProjectReference Include="$(IOViewerSource)/src/IOViewer/IOViewer.csproj" Condition="'$(IOViewerSource)' != ''" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="compat/**/*.cs;profile-tool/**/*.cs" />
+  </ItemGroup>
+</Project>

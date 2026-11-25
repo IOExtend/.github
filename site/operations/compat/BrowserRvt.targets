@@ -1,0 +1,8 @@
+<Project>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'RvtIO'">
+    <Compile Include="$(MSBuildThisFileDirectory)BrowserIfcHash.cs" />
+    <Reference Include="BouncyCastle.Cryptography">
+      <HintPath>$(NuGetPackageRoot)bouncycastle.cryptography/2.6.2/lib/net6.0/BouncyCastle.Cryptography.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

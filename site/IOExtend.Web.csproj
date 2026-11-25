@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PublishTrimmed>false</PublishTrimmed>
+    <WasmBuildNative>false</WasmBuildNative>
+    <RvtIOProgressSource Condition="'$(RvtIOProgressSource)' == ''">../RvtIO</RvtIOProgressSource>
+    <DefineConstants Condition="'$(IOViewerSource)' != ''">$(DefineConstants);LOCAL_MESH_PAGES</DefineConstants>
+    <DefaultItemExcludes>$(DefaultItemExcludes);operations/**;wwwroot/paged-viewer.html;wwwroot/paged-storage.js</DefaultItemExcludes>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IOExtendAot)' == 'true'">
+    <TargetFramework>net11.0</TargetFramework>
+    <WasmBuildNative>true</WasmBuildNative>
+    <RunAOTCompilation>true</RunAOTCompilation>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+    <EmccInitialHeapSize>33554432</EmccInitialHeapSize>
+    <EmccMaximumHeapSize>4294901760</EmccMaximumHeapSize>
+    <EmccExtraLDFlags>$(EmccExtraLDFlags) -sMALLOC=dlmalloc</EmccExtraLDFlags>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IOExtendPooledGc)' == 'true'">
+    <DefineConstants>$(DefineConstants);POOLED_BROWSER_GC</DefineConstants>
+    <EmccExtraLDFlags>$(EmccExtraLDFlags) -Wl,--wrap=sgen_alloc_os_memory_aligned -Wl,--wrap=sgen_free_os_memory</EmccExtraLDFlags>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(IOExtendPooledGc)' == 'true'">
+    <NativeFileReference Include="$(MSBuildProjectDirectory)/SgenBlockPool.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="IOViewer" Version="0.3.1" Condition="'$(IOViewerSource)' == ''" />
+    <ProjectReference Include="$(IOViewerSource)/src/IOViewer/IOViewer.csproj" Condition="'$(IOViewerSource)' != ''" />
+    <ProjectReference Include="$(RvtIOProgressSource)/src/RvtIO.Scene/RvtIO.Scene.csproj" />
+    <PackageReference Include="NwcIO.Scene" Version="0.17.0" />
+    <Content Include="wwwroot/paged-viewer.html;wwwroot/paged-storage.js" Condition="'$(IOViewerSource)' != ''" />
+  </ItemGroup>
+  <Target Name="BuildLocalMeshAssets" BeforeTargets="PrepareForBuild" Condition="'$(IOViewerSource)' != ''">
+    <Exec Command="node &quot;$(MSBuildProjectDirectory)/build-paged-viewer.mjs&quot; &quot;$(IOViewerSource)&quot;" />
+  </Target>
+  <Target Name="PrepareWebRelease" AfterTargets="Publish">
+    <Exec Command="node &quot;$(MSBuildProjectDirectory)/prepare-web-release.mjs&quot; &quot;$(PublishDir)wwwroot&quot;" />
+  </Target>
+  <Target Name="WriteReaderProfile" BeforeTargets="AssignTargetPaths">
+    <Error Condition="'$(IOExtendPooledGc)' == 'true' and '$(IOExtendAot)' != 'true'"
+           Text="The pooled browser GC profile requires IOExtendAot=true." />
+    <PropertyGroup>
+      <_ReaderProfile>$(IntermediateOutputPath)reader-profile.js</_ReaderProfile>
+      <_UsePooledGc>false</_UsePooledGc>
+      <_UsePooledGc Condition="'$(IOExtendPooledGc)' == 'true'">true</_UsePooledGc>
+    </PropertyGroup>
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <WriteLinesToFile File="$(_ReaderProfile)" Lines="export const pooledGc = $(_UsePooledGc)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <Content Include="$(_ReaderProfile)" Link="wwwroot/reader-profile.js"
+               CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+</Project>

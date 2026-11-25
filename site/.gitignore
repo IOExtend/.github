@@ -1,0 +1,4 @@
+bin/
+obj/
+wwwroot/paged-viewer.html
+wwwroot/paged-storage.js
