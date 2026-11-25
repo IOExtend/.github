@@ -34,6 +34,8 @@ dotnet publish -c Release -o publish-web-aot -p:IOExtendAot=true -p:RvtIOProgres
 финализации. Для этого профиля добавьте флаг к команде AOT-сборки. Посетитель открывает её как обычную
 статическую страницу в Chromium.
 
+Для сравнительного прогона используйте исходники RvtIO с оптимизациями из #309 и исправлением для однопоточного WebAssembly из #310. Передайте `-p:RvtIOPartitionScratch=false`, если исходники ещё не содержат API временного хранения из #308. В такой сборке RvtIO держит распакованные сегменты в памяти, а IOViewer может записать готовую сцену в страницы. Для крупных RVT базовая сборка использует временное хранение из #308. [RvtIO #309](https://github.com/IOExtend/RvtIO/pull/309) · [RvtIO #310](https://github.com/IOExtend/RvtIO/pull/310)
+
 ## Экспорт и даунгрейд
 
 После публикации сайта соберите браузерные обработчики в тот же `wwwroot` с .NET 10 SDK. Для экспорта проверены RvtIO `9f9a43f` и NwcIO `d2c8469` (0.17.0). Для даунгрейда использовалась ветка `feat/revit-downgrade` RvtIO, коммит `7936c6e`.
@@ -43,6 +45,7 @@ dotnet publish -c Release -o publish-web-aot -p:IOExtendAot=true -p:RvtIOProgres
 ```
 
 С .NET 11 SDK и рабочей нагрузкой `wasm-tools` к команде можно добавить `-ExportLargeHeap`. Этот профиль собирает обработчик экспорта с верхней границей линейной памяти почти 4 ГиБ.
+Для сравнительной сборки экспорта с исходниками из #310 передайте `-RvtIOPartitionScratch:$false`. Доступные счётчики этапов зависят от API выбранного ядра.
 
 Добавьте `-IOViewerSource /path/to/IOViewer`, чтобы использовать актуальную сборку автономного просмотрщика в HTML-экспорте RVT, RFA, NWC и NWD. Перед сборкой выполните `npm ci` и `npm run build` в каталоге `src/IOViewer/Viewer`. Прежний HTML Navisworks доступен отдельно среди дополнительных форматов.
 
@@ -93,3 +96,4 @@ node smoke.cjs http://127.0.0.1:8976/ path/to/sample.rvt path/to/sample.nwc
 ```
 
 Установите `IOEXTEND_REQUIRE_PAGED=1`, чтобы тест потребовал постраничный рендеринг для треугольной модели RVT.
+Для сборки с `-p:RvtIOPartitionScratch=false` задайте `IOEXTEND_RVT_PARTITION_SCRATCH=0`, чтобы проверка учитывала набор событий прогресса этой версии ядра.

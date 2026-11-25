@@ -7,6 +7,7 @@ const { chromium } = require('playwright');
 
 const [url, rvtPath, nwcPath] = process.argv.slice(2);
 assert(url && rvtPath && nwcPath, 'Usage: node smoke.cjs <preview-url> <rvt> <nwc>');
+const partitionScratch = process.env.IOEXTEND_RVT_PARTITION_SCRATCH !== '0';
 
 async function drop(target, files) {
   await target.evaluate(items => {
@@ -143,7 +144,8 @@ async function drop(target, files) {
         assert(updates.some(update => /Собираем модель Revit · .* из .* записей/.test(update.status)), 'RVT reports model construction counts');
         assert(updates.some(update => update.status.includes('Уточняем единицы измерения и координаты')), 'RVT reports the last stage of model resolution');
         assert(updates.some(update => update.status.includes('Готовим модель к построению 3D-сцены')), 'RVT reports document preparation');
-        assert(updates.some(update => /Строим 3D-сцену RVT · .* из .* элементов/.test(update.status)), 'RVT reports mesh extraction counts');
+        if (partitionScratch)
+          assert(updates.some(update => /Строим 3D-сцену RVT · .* из .* элементов/.test(update.status)), 'RVT reports mesh extraction counts');
         if (process.env.IOEXTEND_REQUIRE_PAGED === '1') {
           assert(paged?.pages > 0 && paged.triangles > 0 && paged.propertyMatches, 'RVT shows local pages and element properties');
           assert.equal(paged.elements, sceneMetrics.elements, 'The page manifest includes every scene element');
@@ -178,7 +180,7 @@ async function drop(target, files) {
       assert(instances > 0, 'Viewer has no instances');
       assert(memoryUpdates.some(update => update.totalInputBytes > 0), 'Viewer reads the source file by range');
       assert(memoryUpdates.every(update => update.maxWindowBytes <= 64 * 1024), 'File read window is bounded to 64 KiB');
-      if (paged && name.endsWith('.rvt')) {
+      if (paged && name.endsWith('.rvt') && partitionScratch) {
         assert(partitionRelease?.partitionBytes > 0, 'The RVT partition scratch was released');
         assert(partitionRelease.beforeScene, 'Partition scratch is released before the scene is ready');
       }

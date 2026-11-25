@@ -5,7 +5,8 @@ param(
     [Parameter(Mandatory)] [string] $NwcIOSource,
     [Parameter(Mandatory)] [string] $DowngradeSource,
     [switch] $ExportLargeHeap,
-    [string] $IOViewerSource
+    [string] $IOViewerSource,
+    [bool] $RvtIOPartitionScratch = $true
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,6 +32,7 @@ Publish-Tool 'model-export' @(
     "-p:NwcIOSource=$((Resolve-Path -LiteralPath $NwcIOSource).Path)"
     "-p:CustomAfterMicrosoftCommonTargets=$(Join-Path $PSScriptRoot 'compat/BrowserRvt.targets')"
     "-p:IOExtendLargeExportHeap=$($ExportLargeHeap.IsPresent.ToString().ToLowerInvariant())"
+    "-p:RvtIOPartitionScratch=$($RvtIOPartitionScratch.ToString().ToLowerInvariant())"
     if ($IOViewerSource) { "-p:IOViewerSource=$((Resolve-Path -LiteralPath $IOViewerSource).Path)" }
 )
 Publish-Tool 'revit-downgrade' @(

@@ -77,11 +77,14 @@ internal static partial class Program
 
     private static (SceneDocument, IReadOnlyList<SceneDiagnostic>) ReadRvt(Stream stream, string name, Stream? triangleScratch)
     {
+#if RVT_PARTITION_SCRATCH
         bool releasePartitions = triangleScratch != null;
+#endif
         var options = new RvtSceneOptions
         {
             ModelKey = name,
             ReadProgress = new InlineProgress<RvtReadProgress>(ReportRvtProgress),
+#if RVT_PARTITION_SCRATCH
             MeshProgress = new InlineProgress<(int Completed, int Total)>(update =>
             {
                 // The reader has disposed its partition stream before mesh extraction starts.
@@ -93,10 +96,15 @@ internal static partial class Program
                 ReportRvtMeshProgress(update);
             }),
             CreatePartitionScratch = triangleScratch == null ? null : () => new BufferedStream(new BrowserScratchStream(), 64 * 1024),
+#endif
         };
+#if RVT_PARTITION_SCRATCH
         var result = triangleScratch == null
             ? RvtSceneReader.ReadStream(stream, options)
             : RvtSceneReader.ReadStream(stream, options, triangleScratch);
+#else
+        var result = RvtSceneReader.ReadStream(stream, options);
+#endif
         return (result.Document, result.Diagnostics);
     }
 
@@ -138,6 +146,7 @@ internal static partial class Program
                     update.Completed, update.Total);
                 break;
             case "element-blocks":
+#if RVT_PARTITION_SCRATCH
                 if (update.GeometryBlocks is { } geometry)
                 {
                     double pass = update.Completed + geometry.Completed / (double)geometry.Total;
@@ -145,15 +154,15 @@ internal static partial class Program
                     ReportProgress(percent, "view.geometry", geometry.Completed, geometry.Total);
                 }
                 else
-                {
+#endif
                     ReportProgress(Within(31, 46, update), "view.blocks", update.Completed, update.Total);
-                }
                 break;
             case "parameter-stream":
                 ReportProgress(Within(47, 63, update), update.Total > 0 ? "view.paramCount" : "phase.parameter-stream",
                     ToMiB(update.Completed), ToMiB(update.Total));
                 break;
             case "recover-geometry":
+#if RVT_PARTITION_SCRATCH
                 if (update.GeometryBlocks is { } recovered)
                 {
                     var (percent, stage) = update.Completed switch
@@ -166,6 +175,7 @@ internal static partial class Program
                     ReportProgress(percent, stage, recovered.Completed, recovered.Total);
                 }
                 else
+#endif
                 {
                     switch (update.Completed)
                     {

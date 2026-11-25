@@ -8,6 +8,7 @@
     <PublishTrimmed>false</PublishTrimmed>
     <WasmBuildNative>false</WasmBuildNative>
     <RvtIOProgressSource Condition="'$(RvtIOProgressSource)' == ''">../RvtIO</RvtIOProgressSource>
+    <DefineConstants Condition="'$(RvtIOPartitionScratch)' != 'false'">$(DefineConstants);RVT_PARTITION_SCRATCH</DefineConstants>
     <DefineConstants Condition="'$(IOViewerSource)' != ''">$(DefineConstants);LOCAL_MESH_PAGES</DefineConstants>
     <DefaultItemExcludes>$(DefaultItemExcludes);operations/**;wwwroot/paged-viewer.html;wwwroot/paged-storage.js</DefaultItemExcludes>
   </PropertyGroup>

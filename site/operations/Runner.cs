@@ -128,13 +128,17 @@ internal static partial class Runner
         {
             ReadProgress = new InlineProgress<RvtReadProgress>(update =>
             {
+#if RVT_PARTITION_SCRATCH
                 if (update.GeometryBlocks is { } blocks)
                     ReportProgress("geometry-blocks", blocks.Completed, blocks.Total);
                 else
+#endif
                     ReportProgress(update.Phase, update.Completed, update.Total);
             }),
+#if RVT_PARTITION_SCRATCH
             MeshProgress = new InlineProgress<(int Completed, int Total)>(update =>
                 ReportProgress("meshes", update.Completed, update.Total)),
+#endif
         });
         return WriteScene(result.Document, result.Diagnostics, output);
     }
