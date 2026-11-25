@@ -136,16 +136,21 @@ async function drop(target, files) {
       assert(updates.some(update => update.value > 10 && update.value < 90), 'Progress advances before completion');
       assert(updates.every((update, index) => !index || update.value >= updates[index - 1].value), 'Progress never moves backwards');
       if (name.endsWith('.rvt')) {
-        assert(updates.some(update => /Читаем записи элементов · .* из .* блоков/.test(update.status)), 'RVT reports record scan counts');
         assert(updates.some(update => /из \d+ проходов/.test(update.status)), 'RVT reports block passes');
         assert(updates.some(update => /из .* МиБ/.test(update.status)), 'RVT reports byte counts');
-        assert(updates.some(update => update.status.includes('Ищем дополнительные блоки геометрии')), 'RVT reports geometry recovery');
-        assert(updates.some(update => /Сопоставляем имена и свойства · .* из .* блоков/.test(update.status)), 'RVT reports name scan counts');
-        assert(updates.some(update => /Собираем модель Revit · .* из .* записей/.test(update.status)), 'RVT reports model construction counts');
-        assert(updates.some(update => update.status.includes('Уточняем единицы измерения и координаты')), 'RVT reports the last stage of model resolution');
         assert(updates.some(update => update.status.includes('Готовим модель к построению 3D-сцены')), 'RVT reports document preparation');
-        if (partitionScratch)
+        if (partitionScratch) {
+          assert(updates.some(update => /Читаем записи элементов · .* из .* блоков/.test(update.status)), 'RVT reports record scan counts');
+          assert(updates.some(update => update.status.includes('Ищем дополнительные блоки геометрии')), 'RVT reports geometry recovery');
+          assert(updates.some(update => /Сопоставляем имена и свойства · .* из .* блоков/.test(update.status)), 'RVT reports name scan counts');
+          assert(updates.some(update => /Собираем модель Revit · .* из .* записей/.test(update.status)), 'RVT reports model construction counts');
+          assert(updates.some(update => update.status.includes('Уточняем единицы измерения и координаты')), 'RVT reports the last stage of model resolution');
           assert(updates.some(update => /Строим 3D-сцену RVT · .* из .* элементов/.test(update.status)), 'RVT reports mesh extraction counts');
+        } else {
+          for (const stage of ['Читаем записи элементов', 'Восстанавливаем геометрию',
+            'Собираем свойства элементов', 'Собираем модель', 'Связываем элементы и типы'])
+            assert(updates.some(update => update.status.includes(stage)), `RVT reports the opening stage "${stage}"`);
+        }
         if (process.env.IOEXTEND_REQUIRE_PAGED === '1') {
           assert(paged?.pages > 0 && paged.triangles > 0 && paged.propertyMatches, 'RVT shows local pages and element properties');
           assert.equal(paged.elements, sceneMetrics.elements, 'The page manifest includes every scene element');
