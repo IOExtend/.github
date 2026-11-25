@@ -1,5 +1,7 @@
 import { formatNumber, lang, localize, message, setupLanguage, t } from './i18n.js';
-import { threaded } from './reader-profile.js';
+import * as readerProfile from './reader-profile.js';
+
+const { fallbackReader, threaded } = readerProfile;
 
 const workspace = document.querySelector('#workspace');
 const dropArea = document.querySelector('#drop-area');
@@ -15,6 +17,7 @@ const elapsedLabel = document.querySelector('#open-elapsed');
 const modelBar = document.querySelector('#model-bar');
 const modelName = document.querySelector('#model-name');
 let viewer = document.querySelector('#viewer');
+const threadedStartupTimeout = 60_000;
 
 let opening;
 let displayedScratch;
@@ -23,16 +26,16 @@ let elapsedTimer;
 let modelUrl;
 let dragDepth = 0;
 let statusText;
+let readerPath = './reader.js';
+let stopIsolationReload;
 
 if (threaded && !crossOriginIsolated && navigator.serviceWorker && !navigator.serviceWorker.controller) {
-  // Wait for the first controlled navigation before accepting a local file.
-  openButton.disabled = true;
   const reload = () => location.reload();
+  stopIsolationReload = () => navigator.serviceWorker.removeEventListener('controllerchange', reload);
   navigator.serviceWorker.addEventListener('controllerchange', reload, { once: true });
   navigator.serviceWorker.register(new URL('../../thread-isolation.js', import.meta.url)).catch(error => {
-    navigator.serviceWorker.removeEventListener('controllerchange', reload);
-    console.error(error);
-    showStatus(message('workerFailed'), true);
+    stopIsolationReload();
+    console.warn('Could not enable threaded viewer isolation.', error);
   });
 }
 
@@ -72,7 +75,6 @@ function showProgress(open, { percent, key, completed, total, level, label }) {
   openingMeter.value = Math.max(openingMeter.value, percent);
   percentLabel.textContent = `≈ ${openingMeter.value}%`;
   showStatus(() => {
-    if (!key) return `${label} · ${open.file.name}`;
     const options = { maximumFractionDigits: 1 };
     const values = {
       completed: formatNumber(completed ?? 0, options),
@@ -80,7 +82,8 @@ function showProgress(open, { percent, key, completed, total, level, label }) {
       level: formatNumber(level ?? 0),
     };
     const withCount = total > 0 && ['view.decodeFound', 'view.wallGeometry', 'view.decodeGeometry'].includes(key);
-    return [t(key, values), withCount ? t('count', values) : '', open.file.name].filter(Boolean).join(' · ');
+    return [open.recovering && t('view.fallback'), key ? t(key, values) : label,
+      withCount && t('count', values), open.file.name].filter(Boolean).join(' · ');
   });
 }
 
@@ -130,32 +133,59 @@ async function cleanAbandonedScratch() {
   }
 }
 
-function runWorker(open, path, data) {
+function runWorker(open, path, data, startupTimeout) {
   const { signal } = open.controller;
   signal.throwIfAborted();
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL(path, import.meta.url), { type: 'module' });
+    const failed = (error = new Error()) => Object.assign(error, {
+      localized: message('workerFailed'), retryable: true,
+    });
+    let worker;
+    try { worker = new Worker(new URL(path, import.meta.url), { type: 'module' }); }
+    catch (error) { reject(failed(error)); return; }
     function settle(callback, value) {
+      clearTimeout(startup);
       signal.removeEventListener('abort', abort);
-      worker.onmessage = worker.onerror = null;
+      worker.onmessage = worker.onmessageerror = worker.onerror = null;
       worker.terminate();
       callback(value);
     }
     const abort = () => settle(reject, signal.reason);
     signal.addEventListener('abort', abort, { once: true });
-    worker.onerror = () => settle(reject, Object.assign(new Error(), { localized: message('workerFailed') }));
+    worker.onerror = worker.onmessageerror = event => {
+      event.preventDefault();
+      settle(reject, failed());
+    };
     worker.onmessage = ({ data: result }) => {
+      clearTimeout(startup);
       if (result?.progress) {
         showProgress(open, result.progress);
         return;
       }
       if (result?.error || result?.localized)
-        settle(reject, Object.assign(new Error(result.error), { localized: result.localized }));
+        settle(reject, Object.assign(new Error(result.error), {
+          localized: result.localized, retryable: result.retryable,
+        }));
       else if (result?.html || result?.triangles || result?.files) settle(resolve, result);
     };
+    const startup = startupTimeout && setTimeout(() => settle(reject, failed()), startupTimeout);
     try { worker.postMessage(data); }
     catch (error) { settle(reject, error); }
   });
+}
+
+async function prepareScratch(open) {
+  if (!/\.rvt$/i.test(open.file.name) || !globalThis.crypto?.randomUUID || !navigator.storage?.getDirectory) return;
+  const name = `ioviewer-open-${crypto.randomUUID()}.tmp`;
+  open.scratch = { name };
+  try {
+    open.scratch.release = await holdScratchLease(name);
+    const directory = await navigator.storage.getDirectory();
+    open.controller.signal.throwIfAborted();
+    return await directory.getDirectoryHandle(name, { create: true });
+  } catch (error) {
+    if (!['SecurityError', 'NotAllowedError', 'NotSupportedError'].includes(error.name)) throw error;
+  }
 }
 
 function setViewerSource(frame, source) {
@@ -216,10 +246,6 @@ function stagePagedFrame(open, files) {
 
 async function openFile(file) {
   if (!(file instanceof File) || opening) return;
-  if (threaded && !crossOriginIsolated) {
-    showStatus(message('workerFailed'), true);
-    return;
-  }
   if (!/\.(rvt|nwc)$/i.test(file.name)) {
     showStatus(message('chooseRvtNwc'), true);
     return;
@@ -230,6 +256,14 @@ async function openFile(file) {
     return;
   }
 
+  stopIsolationReload?.();
+  if (threaded && (!crossOriginIsolated || typeof SharedArrayBuffer === 'undefined')) {
+    if (!fallbackReader) {
+      showStatus(message('workerFailed'), true);
+      return;
+    }
+    readerPath = fallbackReader;
+  }
   document.dispatchEvent(new CustomEvent('viewer-model-selected', { detail: file }));
   const open = { file, controller: new AbortController() };
   opening = open;
@@ -239,20 +273,24 @@ async function openFile(file) {
   startOpeningProgress();
 
   try {
-    let scratchDirectory;
-    if (/\.rvt$/i.test(file.name) && globalThis.crypto?.randomUUID && navigator.storage?.getDirectory) {
-      const name = `ioviewer-open-${crypto.randomUUID()}.tmp`;
-      open.scratch = { name };
-      try {
-        open.scratch.release = await holdScratchLease(name);
-        const directory = await navigator.storage.getDirectory();
-        open.controller.signal.throwIfAborted();
-        scratchDirectory = await directory.getDirectoryHandle(name, { create: true });
-      } catch (error) {
-        if (!['SecurityError', 'NotAllowedError', 'NotSupportedError'].includes(error.name)) throw error;
-      }
+    let scratchDirectory = await prepareScratch(open);
+    let result;
+    try {
+      result = await runWorker(open, readerPath, { file, scratchDirectory },
+        fallbackReader && readerPath !== fallbackReader ? threadedStartupTimeout : undefined);
+    } catch (error) {
+      open.controller.signal.throwIfAborted();
+      if (!fallbackReader || readerPath === fallbackReader || !error.retryable) throw error;
+      readerPath = fallbackReader;
+      open.recovering = true;
+      openingMeter.value = 0;
+      showProgress(open, { percent: 0, key: 'loadKernel' });
+      await disposeScratch(open.scratch);
+      open.scratch = undefined;
+      open.controller.signal.throwIfAborted();
+      scratchDirectory = await prepareScratch(open);
+      result = await runWorker(open, readerPath, { file, scratchDirectory });
     }
-    const result = await runWorker(open, './reader.js', { file, scratchDirectory });
     let frame, pagesFiles;
     if (result.triangles) {
       showProgress(open, { percent: 97, key: 'view.preparePages', completed: result.triangles });
@@ -308,7 +346,10 @@ async function openFile(file) {
 }
 
 for (const button of [openButton, replaceButton]) {
-  button.addEventListener('click', () => input.click());
+  button.addEventListener('click', () => {
+    stopIsolationReload?.();
+    input.click();
+  });
 }
 
 input.addEventListener('change', () => {

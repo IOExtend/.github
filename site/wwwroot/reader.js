@@ -6,6 +6,7 @@ import { viewerTheme } from './viewer-theme.js';
 const memoryError = /garbage collector could not allocate|failed to allocate memory for the lock free allocator|out of memory|outofmemoryexception|cannot enlarge memory|could not allocate \d+.* bytes/i;
 // Release versions of Mono can report the eglib allocation failure with its text stripped.
 const monoAllocatorError = /\[MONO\] [^\r\n]*\/eglib\/gmem\.c:\d+ <disabled>/;
+const runtimeTrap = /memory access out of bounds/;
 const inputWindowSize = 64 * 1024;
 const inputWindowCount = 256;
 const localizedErrors = new Set([
@@ -43,27 +44,25 @@ function viewerPage(bytes) {
 self.onmessage = async ({ data: { file, scratchDirectory } }) => {
   let exhaustedMemory = false;
   let exhaustedStorage = false;
+  let trapped = false;
+  let loadingRuntime = false;
   const scratch = [];
   const scratchLengths = [0, 0];
   let scratchBytes = 0;
   const logError = console.error;
   console.error = (...messages) => {
     // Mono emits the reason before throwing an opaque WebAssembly ExitStatus.
-    exhaustedMemory ||= messages.some(message => {
-      if (typeof message !== 'string' && !(message instanceof Error)) return false;
+    for (const message of messages) {
+      if (typeof message !== 'string' && !(message instanceof Error)) continue;
       const diagnostic = String(message);
-      return memoryError.test(diagnostic) || monoAllocatorError.test(diagnostic);
-    });
+      exhaustedMemory ||= memoryError.test(diagnostic) || monoAllocatorError.test(diagnostic);
+      trapped ||= runtimeTrap.test(diagnostic);
+    }
     logError.apply(console, messages);
   };
 
   let result;
   try {
-    if (threaded) {
-      dotnet.withEnvironmentVariable('DOTNET_PROCESSOR_COUNT', String(Math.min(4, navigator.hardwareConcurrency || 1)));
-      // .NET 10's generated interpreter stubs import a heap capped at 2 GiB.
-      dotnet.withRuntimeOptions(['--no-jiterpreter-traces-enabled']);
-    }
     if (scratchDirectory && globalThis.FileSystemFileHandle?.prototype.createSyncAccessHandle) {
       try {
         for (const name of ['partitions', 'triangles']) {
@@ -87,6 +86,12 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
     let checkingContainer = true;
     let nextContainerReport = 0;
     const fileReader = new FileReaderSync();
+    loadingRuntime = true;
+    if (threaded) {
+      dotnet.withEnvironmentVariable('DOTNET_PROCESSOR_COUNT', String(Math.min(4, navigator.hardwareConcurrency || 1)));
+      // .NET 10's generated interpreter stubs import a heap capped at 2 GiB.
+      dotnet.withRuntimeOptions(['--no-jiterpreter-traces-enabled']);
+    }
     // Mono's WebAssembly heap cannot shrink. Collect temporary RVT decode data before growing it.
     const runtime = /\.rvt$/i.test(file.name)
       ? dotnet.withEnvironmentVariable('MONO_GC_PARAMS', pooledGc ? 'soft-heap-limit=512m,nursery-size=16m' : 'soft-heap-limit=512m')
@@ -134,7 +139,9 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
       },
       reportCluster(count) { triangles = count; },
       reportHtml(bytes) { html = viewerPage(bytes); },
-      reportFailure(detail) { failure = new Error(detail); },
+      reportFailure(detail, parallelFailure) {
+        failure = Object.assign(new Error(detail), { parallelFailure });
+      },
       reportScene(elements, instances, geometries) {
         console.debug('IOExtend scene', JSON.stringify({ elements, instances, geometries, warnings, errors }));
       },
@@ -187,6 +194,7 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
     });
 
     const exports = await getAssemblyExports(getConfig().mainAssemblyName);
+    loadingRuntime = false;
     self.postMessage({ progress: { percent: 5, key: 'view.check' } });
     nextContainerReport = performance.now() + 500;
     const { Program } = exports;
@@ -199,13 +207,17 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
     result = { warnings, errors, ...(triangles > 0 ? { triangles } : { html }) };
   } catch (error) {
     const detail = error?.message;
+    const outOfMemory = exhaustedMemory || memoryError.test(detail ?? '');
     if (exhaustedStorage)
       result = { localized: { key: 'view.storage' } };
-    else if (exhaustedMemory || memoryError.test(detail ?? ''))
+    else if (outOfMemory)
       result = { localized: { key: 'view.memory' } };
     else if (localizedErrors.has(detail))
       result = { localized: { key: detail } };
     else result = detail ? { error: detail } : { localized: { key: 'processFailed' } };
+    if (threaded && !exhaustedStorage)
+      result.retryable = loadingRuntime || outOfMemory || trapped || error?.parallelFailure === true ||
+        error instanceof WebAssembly.RuntimeError || runtimeTrap.test(detail ?? '');
   } finally {
     console.error = logError;
     for (const handle of scratch) {

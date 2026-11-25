@@ -37,7 +37,8 @@ internal static partial class Program
         catch (Exception error)
         {
             // Exceptions thrown before returning a task do not reach the threaded JS caller.
-            ReportFailure(error is OutOfMemoryException ? nameof(OutOfMemoryException) : error.Message);
+            ReportFailure(error is OutOfMemoryException ? nameof(OutOfMemoryException) : error.Message,
+                error is AggregateException);
         }
         return Task.CompletedTask;
     }
@@ -96,7 +97,7 @@ internal static partial class Program
     private static partial void ReportHtml(byte[] html);
 
     [JSImport("reportFailure", "viewer")]
-    private static partial void ReportFailure(string detail);
+    private static partial void ReportFailure(string detail, bool parallelFailure);
 #endif
 
     [JSImport("reportScene", "viewer")]

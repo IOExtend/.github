@@ -47,7 +47,10 @@
     <Exec Command="node &quot;$(MSBuildProjectDirectory)/build-paged-viewer.mjs&quot; &quot;$(IOViewerSource)&quot;" />
   </Target>
   <Target Name="PrepareWebRelease" AfterTargets="Publish">
-    <Exec Command="node &quot;$(MSBuildProjectDirectory)/prepare-web-release.mjs&quot; &quot;$(PublishDir)wwwroot&quot;" />
+    <Exec Condition="'$(IOExtendFallbackSite)' == ''"
+          Command="node &quot;$(MSBuildProjectDirectory)/prepare-web-release.mjs&quot; &quot;$(PublishDir)wwwroot&quot;" />
+    <Exec Condition="'$(IOExtendFallbackSite)' != ''"
+          Command="node &quot;$(MSBuildProjectDirectory)/prepare-web-release.mjs&quot; &quot;$(PublishDir)wwwroot&quot; &quot;$(IOExtendFallbackSite)&quot;" />
   </Target>
   <Target Name="WriteReaderProfile" BeforeTargets="AssignTargetPaths">
     <Error Condition="'$(IOExtendThreaded)' == 'true' and '$(IOExtendAot)' != 'true'"
