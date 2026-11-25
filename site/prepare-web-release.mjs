@@ -9,7 +9,7 @@ const root = resolve(process.argv[2]);
 const template = await readFile(new URL('./wwwroot/index.html', import.meta.url), 'utf8');
 const entries = [
   'site.css', 'operations.css', 'site.js', 'operations.js', 'i18n.js', 'locale.js', 'translations.js',
-  'formats.js', 'reader.js', 'reader-profile.js', 'viewer-theme.js',
+  'formats.js', 'reader.js', 'reader-host.js', 'reader-profile.js', 'viewer-theme.js',
   'export-worker.js', 'downgrade-worker.js', 'operation-worker.js',
   'revit-versions.js', ...downgradeProfiles.map(year => `profiles/${year}.rvt`),
   'brand/avatar.png', 'brand/banner.png', 'brand/voxel-building.png',

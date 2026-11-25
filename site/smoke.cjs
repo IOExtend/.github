@@ -8,6 +8,7 @@ const { chromium } = require('playwright');
 const [url, rvtPath, nwcPath] = process.argv.slice(2);
 assert(url && rvtPath && nwcPath, 'Usage: node smoke.cjs <preview-url> <rvt> <nwc>');
 const partitionScratch = process.env.IOEXTEND_RVT_PARTITION_SCRATCH !== '0';
+const requireThreads = process.env.IOEXTEND_REQUIRE_THREADS === '1';
 
 async function drop(target, files) {
   await target.evaluate(items => {
@@ -49,16 +50,20 @@ async function drop(target, files) {
     });
     let sceneMetrics;
     let partitionRelease;
+    let sharedHeapSeen = false;
     page.on('pageerror', error => errors.push(error.message));
     page.on('console', message => {
       if (message.type() === 'error' || message.type() === 'warning') browserOutput.push(message.text());
       const text = message.text();
+      if (text === 'IOExtend shared heap true') sharedHeapSeen = true;
       if (text.startsWith('IOExtend memory ')) memoryUpdates.push(JSON.parse(text.slice('IOExtend memory '.length)));
       if (text.startsWith('IOExtend scene ')) sceneMetrics = JSON.parse(text.slice('IOExtend scene '.length));
       if (text.startsWith('IOExtend partitions released '))
         partitionRelease = { ...JSON.parse(text.slice('IOExtend partitions released '.length)), beforeScene: !sceneMetrics };
     });
     await page.goto(url);
+    if (requireThreads)
+      await page.waitForFunction(() => crossOriginIsolated);
     const status = page.locator('#status');
     const viewer = page.frameLocator('#viewer');
     const progress = page.getByRole('progressbar', { name: 'Примерный прогресс открытия модели' });
@@ -93,6 +98,7 @@ async function drop(target, files) {
     for (const [name, path] of [['example.nwc', nwcPath], [basename(rvtPath), rvtPath]]) {
       const started = performance.now();
       memoryUpdates.length = 0;
+      sharedHeapSeen = false;
       sceneMetrics = undefined;
       partitionRelease = undefined;
       await page.evaluate(() => { window.openingUpdates.length = 0; });
@@ -184,6 +190,8 @@ async function drop(target, files) {
         : await viewer.locator('#ioviewer-meta').textContent().then(text => JSON.parse(text).instances.count);
       assert(instances > 0, 'Viewer has no instances');
       assert(memoryUpdates.some(update => update.totalInputBytes > 0), 'Viewer reads the source file by range');
+      if (requireThreads)
+        assert(sharedHeapSeen, 'Viewer opens the model with shared WebAssembly memory');
       assert(memoryUpdates.every(update => update.maxWindowBytes <= 64 * 1024), 'File read window is bounded to 64 KiB');
       if (paged && name.endsWith('.rvt') && partitionScratch) {
         assert(partitionRelease?.partitionBytes > 0, 'The RVT partition scratch was released');
@@ -273,6 +281,7 @@ async function drop(target, files) {
       body: `
         export const dotnet = {
           withEnvironmentVariable() { return this; },
+          withRuntimeOptions() { return this; },
           async create() {
             console.error('[MONO] /runtime/src/mono/mono/eglib/gmem.c:123 <disabled>');
             throw new Error('Program terminated with exit(1)');

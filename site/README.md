@@ -36,6 +36,12 @@ dotnet publish -c Release -o publish-web-aot -p:IOExtendAot=true -p:RvtIOProgres
 
 Для сравнительного прогона используйте исходники RvtIO с оптимизациями из #309 и исправлением для однопоточного WebAssembly из #310. Передайте `-p:RvtIOPartitionScratch=false`, если исходники ещё не содержат API временного хранения из #308. В такой сборке RvtIO держит распакованные сегменты в памяти, а IOViewer может записать готовую сцену в страницы. Для крупных RVT базовая сборка использует временное хранение из #308. [RvtIO #309](https://github.com/IOExtend/RvtIO/pull/309) · [RvtIO #310](https://github.com/IOExtend/RvtIO/pull/310)
 
+Экспериментальный профиль `-p:IOExtendThreaded=true` собирает AOT-версию на .NET 10 SDK с `wasm-tools` и исходниками RvtIO из #311 поверх #308. Передавайте этот флаг вместе с `-p:IOExtendAot=true`. Профиль использует до четырёх потоков для декодирования геометрии, читает временные данные на исходном воркере и применяет результаты в порядке записей RVT. [RvtIO #311](https://github.com/IOExtend/RvtIO/pull/311)
+
+На хостинге с заголовками `Cross-Origin-Opener-Policy: same-origin` и `Cross-Origin-Embedder-Policy: require-corp` профиль запускается сразу. Файлы `.mjs` должны отдаваться с типом JavaScript. Для GitHub Pages разместите эту сборку в отдельном каталоге, например `parallel/`. При первом визите Service Worker добавит заголовки в пределах этого каталога и страница автоматически перезагрузится. Заголовки нужны для общей памяти WebAssembly. Данные модели обрабатываются локально. [Поддержка потоков в .NET WebAssembly](https://github.com/dotnet/runtime/blob/main/src/mono/wasm/features.md#multi-threading)
+
+Переменная `IOEXTEND_REQUIRE_THREADS=1` включает проверку изоляции и общей памяти WebAssembly в `smoke.cjs`.
+
 ## Экспорт и даунгрейд
 
 После публикации сайта соберите браузерные обработчики в тот же `wwwroot` с .NET 10 SDK. Для экспорта проверены RvtIO `9f9a43f` и NwcIO `d2c8469` (0.17.0). Для даунгрейда использовалась ветка `feat/revit-downgrade` RvtIO, коммит `7936c6e`.

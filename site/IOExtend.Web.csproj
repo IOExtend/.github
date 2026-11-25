@@ -11,9 +11,10 @@
     <DefineConstants Condition="'$(RvtIOPartitionScratch)' != 'false'">$(DefineConstants);RVT_PARTITION_SCRATCH</DefineConstants>
     <DefineConstants Condition="'$(IOViewerSource)' != ''">$(DefineConstants);LOCAL_MESH_PAGES</DefineConstants>
     <DefaultItemExcludes>$(DefaultItemExcludes);operations/**;wwwroot/paged-viewer.html;wwwroot/paged-storage.js</DefaultItemExcludes>
+    <DefaultItemExcludes Condition="'$(IOExtendThreaded)' != 'true'">$(DefaultItemExcludes);wwwroot/thread-isolation.js</DefaultItemExcludes>
   </PropertyGroup>
   <PropertyGroup Condition="'$(IOExtendAot)' == 'true'">
-    <TargetFramework>net11.0</TargetFramework>
+    <TargetFramework Condition="'$(IOExtendThreaded)' != 'true'">net11.0</TargetFramework>
     <WasmBuildNative>true</WasmBuildNative>
     <RunAOTCompilation>true</RunAOTCompilation>
     <PublishTrimmed>true</PublishTrimmed>
@@ -21,6 +22,12 @@
     <EmccInitialHeapSize>33554432</EmccInitialHeapSize>
     <EmccMaximumHeapSize>4294901760</EmccMaximumHeapSize>
     <EmccExtraLDFlags>$(EmccExtraLDFlags) -sMALLOC=dlmalloc</EmccExtraLDFlags>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IOExtendThreaded)' == 'true'">
+    <WasmEnableThreads>true</WasmEnableThreads>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(WasmEnableThreads)' == 'true'">
+    <DefineConstants>$(DefineConstants);BROWSER_THREADS</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition="'$(IOExtendPooledGc)' == 'true'">
     <DefineConstants>$(DefineConstants);POOLED_BROWSER_GC</DefineConstants>
@@ -43,15 +50,21 @@
     <Exec Command="node &quot;$(MSBuildProjectDirectory)/prepare-web-release.mjs&quot; &quot;$(PublishDir)wwwroot&quot;" />
   </Target>
   <Target Name="WriteReaderProfile" BeforeTargets="AssignTargetPaths">
+    <Error Condition="'$(IOExtendThreaded)' == 'true' and '$(IOExtendAot)' != 'true'"
+           Text="The threaded browser profile requires IOExtendAot=true." />
+    <Error Condition="'$(IOExtendThreaded)' == 'true' and '$(IOExtendPooledGc)' == 'true'"
+           Text="The pooled browser GC profile requires a single-threaded build." />
     <Error Condition="'$(IOExtendPooledGc)' == 'true' and '$(IOExtendAot)' != 'true'"
            Text="The pooled browser GC profile requires IOExtendAot=true." />
     <PropertyGroup>
       <_ReaderProfile>$(IntermediateOutputPath)reader-profile.js</_ReaderProfile>
       <_UsePooledGc>false</_UsePooledGc>
       <_UsePooledGc Condition="'$(IOExtendPooledGc)' == 'true'">true</_UsePooledGc>
+      <_UseThreads>false</_UseThreads>
+      <_UseThreads Condition="'$(WasmEnableThreads)' == 'true'">true</_UseThreads>
     </PropertyGroup>
     <MakeDir Directories="$(IntermediateOutputPath)" />
-    <WriteLinesToFile File="$(_ReaderProfile)" Lines="export const pooledGc = $(_UsePooledGc)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_ReaderProfile)" Lines="export const pooledGc = $(_UsePooledGc);export const threaded = $(_UseThreads)" Overwrite="true" WriteOnlyWhenDifferent="true" />
     <ItemGroup>
       <Content Include="$(_ReaderProfile)" Link="wwwroot/reader-profile.js"
                CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

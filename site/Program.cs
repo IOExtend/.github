@@ -16,6 +16,32 @@ internal static partial class Program
 {
     private static void Main() { }
 
+#if BROWSER_THREADS
+    [JSExport]
+    internal static Task OpenModel(string name, [JSMarshalAs<JSType.Number>] long length, bool useScratch) =>
+        OpenForWorker(name, length, useScratch, usePages: false);
+
+#if LOCAL_MESH_PAGES
+    [JSExport]
+    internal static Task OpenPagedModel(string name, [JSMarshalAs<JSType.Number>] long length) =>
+        OpenForWorker(name, length, useScratch: true, usePages: true);
+#endif
+
+    private static Task OpenForWorker(string name, long length, bool useScratch, bool usePages)
+    {
+        try
+        {
+            var html = OpenModelCore(name, length, useScratch, usePages);
+            if (html.Length > 0) ReportHtml(html);
+        }
+        catch (Exception error)
+        {
+            // Exceptions thrown before returning a task do not reach the threaded JS caller.
+            ReportFailure(error is OutOfMemoryException ? nameof(OutOfMemoryException) : error.Message);
+        }
+        return Task.CompletedTask;
+    }
+#else
     [JSExport]
     internal static byte[] OpenModel(string name, [JSMarshalAs<JSType.Number>] long length, bool useScratch) =>
         OpenModelCore(name, length, useScratch, usePages: false);
@@ -24,6 +50,7 @@ internal static partial class Program
     [JSExport]
     internal static byte[] OpenPagedModel(string name, [JSMarshalAs<JSType.Number>] long length) =>
         OpenModelCore(name, length, useScratch: true, usePages: true);
+#endif
 #endif
 
     private static byte[] OpenModelCore(string name, long length, bool useScratch, bool usePages)
@@ -63,6 +90,14 @@ internal static partial class Program
         HtmlViewerExporter.Export(scene, html);
         return html.ToArray();
     }
+
+#if BROWSER_THREADS
+    [JSImport("reportHtml", "viewer")]
+    private static partial void ReportHtml(byte[] html);
+
+    [JSImport("reportFailure", "viewer")]
+    private static partial void ReportFailure(string detail);
+#endif
 
     [JSImport("reportScene", "viewer")]
     private static partial void ReportScene(int elements, int instances, int geometries);

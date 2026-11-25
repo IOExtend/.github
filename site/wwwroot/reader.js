@@ -1,5 +1,6 @@
+import './reader-host.js';
 import { dotnet } from './_framework/dotnet.js';
-import { pooledGc } from './reader-profile.js';
+import { pooledGc, threaded } from './reader-profile.js';
 import { viewerTheme } from './viewer-theme.js';
 
 const memoryError = /garbage collector could not allocate|failed to allocate memory for the lock free allocator|out of memory|outofmemoryexception|cannot enlarge memory|could not allocate \d+.* bytes/i;
@@ -58,6 +59,11 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
 
   let result;
   try {
+    if (threaded) {
+      dotnet.withEnvironmentVariable('DOTNET_PROCESSOR_COUNT', String(Math.min(4, navigator.hardwareConcurrency || 1)));
+      // .NET 10's generated interpreter stubs import a heap capped at 2 GiB.
+      dotnet.withRuntimeOptions(['--no-jiterpreter-traces-enabled']);
+    }
     if (scratchDirectory && globalThis.FileSystemFileHandle?.prototype.createSyncAccessHandle) {
       try {
         for (const name of ['partitions', 'triangles']) {
@@ -72,6 +78,8 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
     let warnings = 0;
     let errors = 0;
     let triangles = 0;
+    let html;
+    let failure;
     const inputWindows = new Map();
     let totalInputBytes = 0;
     let maxWindowBytes = 0;
@@ -84,6 +92,8 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
       ? dotnet.withEnvironmentVariable('MONO_GC_PARAMS', pooledGc ? 'soft-heap-limit=512m,nursery-size=16m' : 'soft-heap-limit=512m')
       : dotnet;
     const { getAssemblyExports, getConfig, localHeapViewU8, Module, setModuleImports } = await runtime.create();
+    if (threaded)
+      console.debug('IOExtend shared heap', localHeapViewU8().buffer instanceof SharedArrayBuffer);
     const setSgenPool = Module?._ioextend_set_sgen_pool;
     if (pooledGc && typeof setSgenPool !== 'function')
       throw new Error('view.profileMissing');
@@ -123,6 +133,8 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
           console.debug('IOExtend partitions released', JSON.stringify({ partitionBytes, scratchBytes }));
       },
       reportCluster(count) { triangles = count; },
+      reportHtml(bytes) { html = viewerPage(bytes); },
+      reportFailure(detail) { failure = new Error(detail); },
       reportScene(elements, instances, geometries) {
         console.debug('IOExtend scene', JSON.stringify({ elements, instances, geometries, warnings, errors }));
       },
@@ -179,9 +191,12 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
     nextContainerReport = performance.now() + 500;
     const { Program } = exports;
     const bytes = scratch.length === 2 && typeof Program.OpenPagedModel === 'function'
-      ? Program.OpenPagedModel(file.name, file.size)
-      : Program.OpenModel(file.name, file.size, scratch.length === 2);
-    result = { warnings, errors, ...(triangles > 0 ? { triangles } : { html: viewerPage(bytes) }) };
+      ? await Program.OpenPagedModel(file.name, file.size)
+      : await Program.OpenModel(file.name, file.size, scratch.length === 2);
+    if (failure) throw failure;
+    if (bytes?.length) html = viewerPage(bytes);
+    if (!(triangles > 0) && !html) throw new Error('view.pageFailed');
+    result = { warnings, errors, ...(triangles > 0 ? { triangles } : { html }) };
   } catch (error) {
     const detail = error?.message;
     if (exhaustedStorage)

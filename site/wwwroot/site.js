@@ -1,4 +1,5 @@
 import { formatNumber, lang, localize, message, setupLanguage, t } from './i18n.js';
+import { threaded } from './reader-profile.js';
 
 const workspace = document.querySelector('#workspace');
 const dropArea = document.querySelector('#drop-area');
@@ -22,6 +23,18 @@ let elapsedTimer;
 let modelUrl;
 let dragDepth = 0;
 let statusText;
+
+if (threaded && !crossOriginIsolated && navigator.serviceWorker && !navigator.serviceWorker.controller) {
+  // Wait for the first controlled navigation before accepting a local file.
+  openButton.disabled = true;
+  const reload = () => location.reload();
+  navigator.serviceWorker.addEventListener('controllerchange', reload, { once: true });
+  navigator.serviceWorker.register(new URL('../../thread-isolation.js', import.meta.url)).catch(error => {
+    navigator.serviceWorker.removeEventListener('controllerchange', reload);
+    console.error(error);
+    showStatus(message('workerFailed'), true);
+  });
+}
 
 function showStatus(text, error = false) {
   statusText = typeof text === 'function' ? text : () => localize(text);
@@ -132,13 +145,13 @@ function runWorker(open, path, data) {
     signal.addEventListener('abort', abort, { once: true });
     worker.onerror = () => settle(reject, Object.assign(new Error(), { localized: message('workerFailed') }));
     worker.onmessage = ({ data: result }) => {
-      if (result.progress) {
+      if (result?.progress) {
         showProgress(open, result.progress);
         return;
       }
-      if (result.error || result.localized)
+      if (result?.error || result?.localized)
         settle(reject, Object.assign(new Error(result.error), { localized: result.localized }));
-      else settle(resolve, result);
+      else if (result?.html || result?.triangles || result?.files) settle(resolve, result);
     };
     try { worker.postMessage(data); }
     catch (error) { settle(reject, error); }
@@ -157,7 +170,7 @@ const pagedViewerUrl = new URL('./paged-viewer.html', import.meta.url);
 function syncViewerLanguage() {
   if (opening || viewer.hidden || viewer.dataset.locale === lang) return;
   const frame = viewer.cloneNode(false);
-  setViewerSource(frame, displayedFiles ? pagedViewerUrl : modelUrl);
+  setViewerSource(frame, modelUrl ?? pagedViewerUrl);
   viewer.replaceWith(frame);
   viewer = frame;
 }
@@ -170,7 +183,7 @@ function stagePagedFrame(open, files) {
   frame.hidden = false;
   frame.inert = true;
   frame.classList.add('viewer-loading');
-  setViewerSource(frame, pagedViewerUrl);
+  setViewerSource(frame, open.url ?? pagedViewerUrl);
   open.frame = frame;
   return new Promise((resolve, reject) => {
     function settle(callback, value) {
@@ -203,6 +216,10 @@ function stagePagedFrame(open, files) {
 
 async function openFile(file) {
   if (!(file instanceof File) || opening) return;
+  if (threaded && !crossOriginIsolated) {
+    showStatus(message('workerFailed'), true);
+    return;
+  }
   if (!/\.(rvt|nwc)$/i.test(file.name)) {
     showStatus(message('chooseRvtNwc'), true);
     return;
@@ -239,11 +256,13 @@ async function openFile(file) {
     let frame, pagesFiles;
     if (result.triangles) {
       showProgress(open, { percent: 97, key: 'view.preparePages', completed: result.triangles });
-      const { files, pages } = await runWorker(open, './mesh-pages-worker.js', {
-        scratchDirectory, triangles: result.triangles
+      const { files, pages, html } = await runWorker(open, './mesh-pages-worker.js', {
+        scratchDirectory, triangles: result.triangles,
+        inlineViewer: threaded && Boolean(navigator.serviceWorker?.controller),
       });
       showProgress(open, { percent: 99, key: 'view.openPages', completed: pages });
       pagesFiles = files;
+      if (html) open.url = URL.createObjectURL(html);
       frame = await stagePagedFrame(open, files);
     }
     open.controller.signal.throwIfAborted();
@@ -260,7 +279,8 @@ async function openFile(file) {
       displayedFiles = pagesFiles;
       open.scratch = undefined;
       open.frame = undefined;
-      modelUrl = undefined;
+      modelUrl = open.url;
+      open.url = undefined;
     } else {
       modelUrl = URL.createObjectURL(result.html);
       setViewerSource(viewer, modelUrl);
@@ -281,6 +301,7 @@ async function openFile(file) {
       showStatus(() => t('view.failed', { detail: localize(error.localized ?? error.message) }), true);
   } finally {
     open.frame?.remove();
+    if (open.url) URL.revokeObjectURL(open.url);
     disposeScratch(open.scratch);
     finish(open);
   }
