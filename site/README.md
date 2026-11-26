@@ -123,3 +123,15 @@ node smoke.cjs http://127.0.0.1:8976/ path/to/sample.rvt path/to/sample.nwc
 
 Установите `IOEXTEND_REQUIRE_PAGED=1`, чтобы тест потребовал постраничный рендеринг для треугольной модели RVT.
 Для сборки с `-p:RvtIOPartitionScratch=false` задайте `IOEXTEND_RVT_PARTITION_SCRATCH=0`, чтобы проверка учитывала набор событий прогресса этой версии ядра.
+
+Для замера полного кадра подготовьте релиз с быстрым читателем и откройте его через локальный HTTP-сервер с
+`Cross-Origin-Opener-Policy: same-origin` и `Cross-Origin-Embedder-Policy: require-corp`. Сохраните автономный
+HTML-экспорт исходного `racbasicsampleproject.rvt` из Revit 2027 через нативную сборку RvtIO с IOViewer.
+
+```powershell
+node first-frame-smoke.cjs http://127.0.0.1:8976/ path/to/racbasicsampleproject.rvt path/to/native-export.html
+```
+
+Проверка запускает новый Chromium и передаёт RVT в обычное поле выбора файла. Она выводит `ioextend:first-frame`
+в миллисекундах после проверки видимой сцены, состава модели, свойств, контрольной геометрии и единственной
+загрузки WASM быстрого читателя. Время сборки нативного HTML замеряется отдельно. Результаты описаны в [аудите](AUDIT.md).
