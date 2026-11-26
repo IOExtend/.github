@@ -3,6 +3,7 @@ import { targetReleases } from './revit-versions.js';
 import { formatNumber, hasTranslation, localize, message, t } from './i18n.js';
 
 const byId = id => document.getElementById(id);
+const app = byId('app');
 const workspace = byId('workspace');
 const panel = byId('operations');
 const drop = byId('operation-drop');
@@ -38,7 +39,10 @@ const modes = {
 };
 const states = Object.fromEntries(Object.keys(modes).map(mode =>
   [mode, { selected: new Set(), results: [], message: '', error: false }]));
-let mode, task;
+let mode, task, modelFile;
+
+const accepts = (mode, file) => file && modes[mode].accept.split(',').includes(extensionOf(file.name));
+export const isModelSelectionLocked = () => Boolean(task);
 
 function formatOption(state, format) {
   const label = document.createElement('label');
@@ -63,7 +67,7 @@ function formatOption(state, format) {
 }
 
 function renderFormats(state) {
-  const formats = state.file ? exportFormats(state.file.name) : [];
+  const formats = modelFile ? exportFormats(modelFile.name) : [];
   const primary = formats.filter(format => !format.optional);
   const additional = formats.filter(format => format.optional);
   byId('formats-empty').hidden = formats.length > 0;
@@ -126,7 +130,7 @@ function updateControls(state) {
   targetVersion.disabled = running || mode !== 'downgrade' || !targetReleases(state.version).length;
   drop.classList.toggle('busy', running);
   for (const checkbox of panel.querySelectorAll('input[type=checkbox]')) checkbox.disabled = running;
-  submit.disabled = running || !state.file ||
+  submit.disabled = running || !accepts(mode, modelFile) ||
     (mode === 'export' ? !state.selected.size : !state.target);
   cancel.hidden = task?.mode !== mode || !running;
 }
@@ -139,12 +143,12 @@ function showStatus(state, message, error = false) {
   status.toggleAttribute('data-error', error);
 }
 
-function showFiles(state) {
-  byId('operation-file').textContent = state.file?.name ?? t('dropHere');
-  byId('operation-accept').textContent = state.file
-    ? fileSize(state.file.size)
+function showFile() {
+  byId('operation-file').textContent = modelFile?.name ?? t('dropHere');
+  byId('operation-accept').textContent = modelFile
+    ? fileSize(modelFile.size)
     : modes[mode].accept.replaceAll('.', '').toUpperCase().split(',').join(', ');
-  chooseFile.textContent = t(state.file ? 'chooseAnother' : 'chooseFile');
+  chooseFile.textContent = t(modelFile ? 'chooseAnother' : 'chooseFile');
 }
 
 function showVersions(state) {
@@ -159,13 +163,13 @@ function showVersions(state) {
 }
 
 async function inspectVersion(state) {
-  if (!state.file || state.probe || state.version || state.versionError) return;
+  if (!accepts('downgrade', modelFile) || state.probe || state.version || state.versionError) return;
   const controller = new AbortController();
   state.probe = controller;
   showVersions(state);
   try {
     const result = await runWorker({ mode: 'downgrade', signal: controller.signal },
-      { file: state.file, format: 'revit-version' });
+      { file: modelFile, format: 'revit-version' });
     if (state.probe === controller) state.version = result.version;
   } catch {
     if (state.probe === controller) state.versionError = true;
@@ -236,15 +240,20 @@ function renderProgress() {
 
 function route() {
   const requested = location.hash.slice(1);
+  const previous = mode;
   mode = Object.hasOwn(modes, requested) ? requested : 'view';
   for (const tab of tabs) {
     if (tab.hash === '#' + mode) tab.setAttribute('aria-current', 'page');
     else tab.removeAttribute('aria-current');
   }
+  app.dataset.mode = mode;
   workspace.hidden = mode !== 'view';
   panel.hidden = mode === 'view';
   workspace.classList.remove('dragging');
-  if (panel.hidden) return;
+  if (panel.hidden) {
+    if (mode !== previous) document.dispatchEvent(new Event('view-activated'));
+    return;
+  }
   const settings = modes[mode];
   const state = states[mode];
   byId('operation-title').textContent = t(`${mode}Title`);
@@ -253,7 +262,7 @@ function route() {
   byId('downgrade-settings').hidden = mode !== 'downgrade';
   input.accept = settings.accept;
   submit.textContent = t(`${mode}Action`);
-  showFiles(state);
+  showFile();
   if (mode === 'downgrade') {
     showVersions(state);
     inspectVersion(state);
@@ -265,21 +274,28 @@ function route() {
   renderProgress();
 }
 
+export function selectModelFile(file) {
+  if (task) return;
+  modelFile = file;
+  for (const state of Object.values(states)) {
+    state.probe?.abort();
+    state.probe = state.version = state.versionError = state.target = undefined;
+    state.selected.clear();
+    clearResults(state);
+    showStatus(state, '');
+  }
+  route();
+  document.dispatchEvent(new CustomEvent('model-file-selected', { detail: file }));
+}
+
 function selectFile(file) {
   const state = states[mode];
   if (!state || !file || task) return;
-  const allowed = modes[mode].accept.split(',').includes(extensionOf(file.name));
-  if (!allowed || !file.size) {
+  if (!accepts(mode, file) || !file.size) {
     showStatus(state, message(!file.size ? 'emptyFile' : 'badFormat'), true);
     return;
   }
-  state.probe?.abort();
-  state.probe = state.version = state.versionError = state.target = undefined;
-  state.file = file;
-  state.selected.clear();
-  clearResults(state);
-  route();
-  showStatus(state, '');
+  selectModelFile(file);
 }
 
 function runWorker(job, data, onProgress) {
@@ -289,13 +305,20 @@ function runWorker(job, data, onProgress) {
     const worker = new Worker(new URL(entry, import.meta.url), { type: 'module' });
     function finish(callback, value) {
       job.signal.removeEventListener('abort', abort);
+      worker.onmessage = worker.onmessageerror = worker.onerror = null;
       worker.terminate();
       callback(value);
     }
     const abort = () => finish(reject, job.signal.reason);
     job.signal.addEventListener('abort', abort, { once: true });
-    worker.onerror = () => finish(reject, Object.assign(new Error(), { localized: message('workerFailed') }));
-    worker.onmessageerror = () => finish(reject, Object.assign(new Error(), { localized: message('workerResult') }));
+    worker.onerror = event => {
+      event.preventDefault();
+      finish(reject, Object.assign(new Error(), { localized: message('workerFailed') }));
+    };
+    worker.onmessageerror = event => {
+      event.preventDefault();
+      finish(reject, Object.assign(new Error(), { localized: message('workerResult') }));
+    };
     worker.onmessage = ({ data: result }) => {
       if (result.progress) onProgress?.(result.progress);
       else if (result.error || result.localized) {
@@ -318,8 +341,9 @@ async function start(event) {
   const job = { mode, controller: new AbortController() };
   job.signal = job.controller.signal;
   task = job;
+  document.dispatchEvent(new Event('operation-statechange'));
   const formats = mode === 'downgrade' ? [{ id: 'downgrade', titleKey: 'revitCopy' }]
-    : exportFormats(state.file.name).filter(format => state.selected.has(format.id));
+    : exportFormats(modelFile.name).filter(format => state.selected.has(format.id));
   job.started = performance.now();
   job.total = formats.length;
   clearResults(state);
@@ -339,7 +363,7 @@ async function start(event) {
       };
       reportProgress({ phase: 'prepare' });
       try {
-        const result = await runWorker(job, { file: state.file, format: format.id, target: state.target }, reportProgress);
+        const result = await runWorker(job, { file: modelFile, format: format.id, target: state.target }, reportProgress);
         state.results.push({ ...result, url: URL.createObjectURL(result.file),
           reportUrl: result.report ? URL.createObjectURL(result.report) : undefined });
       } catch (error) {
@@ -356,6 +380,7 @@ async function start(event) {
   } finally {
     clearInterval(timer);
     task = undefined;
+    document.dispatchEvent(new Event('operation-statechange'));
     renderProgress();
     if (!panel.hidden) updateControls(states[mode]);
   }
@@ -372,14 +397,9 @@ byId('operation-form').addEventListener('submit', start);
 cancel.addEventListener('click', () => task?.controller.abort());
 allFormats.addEventListener('click', () => {
   const state = states.export;
-  for (const format of exportFormats(state.file.name).filter(format => !format.optional)) state.selected.add(format.id);
+  for (const format of exportFormats(modelFile.name).filter(format => !format.optional)) state.selected.add(format.id);
   renderFormats(state);
   updateControls(state);
-});
-document.addEventListener('viewer-model-selected', ({ detail: file }) => {
-  for (const [name, state] of Object.entries(states)) {
-    if (!state.file && !task && modes[name].accept.split(',').includes(extensionOf(file.name))) state.file = file;
-  }
 });
 for (const type of ['dragenter', 'dragover', 'dragleave', 'drop']) {
   window.addEventListener(type, event => {

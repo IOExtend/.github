@@ -51,7 +51,7 @@ async function drop(target, files) {
     let sceneMetrics;
     let partitionRelease;
     let sharedHeapSeen = false;
-    page.on('pageerror', error => errors.push(error.message));
+    page.on('pageerror', error => errors.push(error.stack));
     page.on('console', message => {
       if (message.type() === 'error' || message.type() === 'warning') browserOutput.push(message.text());
       const text = message.text();
@@ -101,7 +101,10 @@ async function drop(target, files) {
       sharedHeapSeen = false;
       sceneMetrics = undefined;
       partitionRelease = undefined;
-      await page.evaluate(() => { window.openingUpdates.length = 0; });
+      await page.evaluate(() => {
+        window.openingUpdates.length = window.stagedViewers.length = 0;
+        performance.clearMeasures('ioextend:first-frame');
+      });
       if (name.endsWith('.nwc')) {
         const bytes = (await readFile(path)).toString('base64');
         await drop(page, [{ name, bytes }]);
@@ -192,17 +195,33 @@ async function drop(target, files) {
       assert(memoryUpdates.some(update => update.totalInputBytes > 0), 'Viewer reads the source file by range');
       if (requireThreads)
         assert(sharedHeapSeen, 'Viewer opens the model with shared WebAssembly memory');
-      assert(memoryUpdates.every(update => update.maxWindowBytes <= 64 * 1024), 'File read window is bounded to 64 KiB');
+      const windowBytes = (/\.rvt$/i.test(name) ? 512 : 64) * 1024;
+      assert.equal(Math.max(...memoryUpdates.map(update => update.maxWindowBytes)),
+        Math.min(windowBytes, memoryUpdates[0].fileBytes), 'The reader uses bounded input windows');
       if (paged && name.endsWith('.rvt') && partitionScratch) {
         assert(partitionRelease?.partitionBytes > 0, 'The RVT partition scratch was released');
         assert(partitionRelease.beforeScene, 'Partition scratch is released before the scene is ready');
       }
       assert(await viewer.locator('#ioviewer-message').isHidden(), 'Viewer reported a WebGL or model error');
+      const firstFrame = await page.evaluate(() => performance.getEntriesByName('ioextend:first-frame').at(-1)?.duration);
+      assert(firstFrame > 0, 'The renderer acknowledged its first frame');
       console.log(name + ': ' + instances + ' mesh instances in ' + Math.round(performance.now() - started) + ' ms'
+        + ', first frame in ' + Math.round(firstFrame) + ' ms'
         + (paged ? ', ' + paged.pages + ' pages, ' + paged.triangles + ' triangles' : ''));
     }
 
-    const loadedFrame = await page.locator('#viewer').elementHandle().then(handle => handle.contentFrame());
+    const loadedViewer = await page.locator('#viewer').elementHandle();
+    for (const tab of ['Экспорт', 'Версия Revit']) {
+      await page.getByRole('link', { name: tab }).click();
+      await page.getByRole('link', { name: tab }).and(page.locator('[aria-current=page]')).waitFor();
+      assert.equal(await page.locator('#operation-file').textContent(), basename(rvtPath));
+      assert(await page.locator('#viewer').isHidden());
+      assert(await loadedViewer.evaluate(node => node === document.getElementById('viewer')));
+    }
+    await page.getByRole('link', { name: 'Просмотр' }).click();
+    await page.locator('#model-name').getByText(basename(rvtPath), { exact: true }).waitFor();
+    assert(await loadedViewer.evaluate(node => node === document.getElementById('viewer')));
+    const loadedFrame = await loadedViewer.contentFrame();
     await drop(loadedFrame, [{ name: 'unsupported.ifc', bytes: 'AQ==' }]);
     await status.getByText('Выберите файл RVT или NWC.').waitFor();
     const bytes = (await readFile(nwcPath)).toString('base64');

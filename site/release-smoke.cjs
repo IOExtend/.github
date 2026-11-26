@@ -53,7 +53,8 @@ const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 
     const browser = await chromium.launch({ executablePath: process.env.VIEWER_CHROME });
     try {
       const base = 'http://127.0.0.1:' + server.address().port + '/';
-      const context = await browser.newContext({ viewport: { width: 1707, height: 780 }, deviceScaleFactor: 2.25, locale: 'ru-RU' });
+      // Exercise the browser HTTP cache independently of viewer isolation.
+      const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1707, height: 780 }, deviceScaleFactor: 2.25, locale: 'ru-RU' });
       const page = await context.newPage();
       const logo = page.locator('.brand img');
       await page.goto(base);
@@ -77,7 +78,7 @@ const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 
       await context.close();
 
       phase = 'no-css';
-      const fallback = await browser.newPage({ viewport: { width: 320, height: 780 } });
+      const fallback = await browser.newPage({ serviceWorkers: 'block', viewport: { width: 320, height: 780 } });
       await fallback.goto(base);
       assert.equal((await fallback.locator('.brand img').boundingBox()).width, 224);
       await fallback.close();

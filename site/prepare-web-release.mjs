@@ -4,13 +4,20 @@ import { dirname, join, resolve } from 'node:path';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
 import { downgradeProfiles } from './wwwroot/revit-versions.js';
 
-if (!process.argv[2])
-  throw new Error('Usage: node prepare-web-release.mjs <published-wwwroot> [single-threaded-wwwroot]');
-const root = resolve(process.argv[2]);
+const [destination, ...arguments_] = process.argv.slice(2);
+const fallbackSource = arguments_[0] && !arguments_[0].startsWith('--') ? arguments_.shift() : undefined;
+let fastSource;
+if (arguments_[0] === '--fast-reader' && arguments_.length === 2) {
+  fastSource = arguments_[1];
+  arguments_.length = 0;
+}
+if (!destination || arguments_.length)
+  throw new Error('Usage: node prepare-web-release.mjs <published-wwwroot> [single-threaded-wwwroot] [--fast-reader <fast-wwwroot>]');
+const root = resolve(destination);
 const template = await readFile(new URL('./wwwroot/index.html', import.meta.url), 'utf8');
 const entries = [
   'site.css', 'operations.css', 'site.js', 'operations.js', 'i18n.js', 'locale.js', 'translations.js',
-  'formats.js', 'reader.js', 'reader-host.js', 'reader-profile.js', 'viewer-theme.js',
+  'formats.js', 'reader.js', 'reader-host.js', 'reader-profile.js', 'reader-scratch.js', 'viewer-theme.js',
   'export-worker.js', 'downgrade-worker.js', 'operation-worker.js',
   'revit-versions.js', ...downgradeProfiles.map(year => `profiles/${year}.rvt`),
   'brand/avatar.png', 'brand/banner.png', 'brand/voxel-building.png',
@@ -55,12 +62,19 @@ const assets = new Map(await Promise.all(entries.map(async name => {
   return [name, Buffer.from(source.replace(specifier, `'../../${loaders.get(runtime)}'`))];
 })));
 
-const profile = assets.get('reader-profile.js').toString('utf8');
+let profile = assets.get('reader-profile.js').toString('utf8');
 if (/^export const threaded = true;?$/m.test(profile)) {
-  const fallback = await installFallback(process.argv[3]);
-  assets.set('reader-profile.js', Buffer.from(
-    `${profile}\nexport const fallbackReader = '${fallback}'\n`));
+  const fallback = await installFallback(fallbackSource);
+  profile += "\nexport const fallbackReader = '" + fallback + "'\n";
 }
+if (fastSource) {
+  if (!optional[1]) throw new Error('The fast reader requires the paged fallback.');
+  const fast = await installFastReader(fastSource);
+  const isolation = await readFile(new URL('./wwwroot/thread-isolation.js', import.meta.url));
+  await writeAsset(join(root, 'thread-isolation.js'), isolation);
+  profile += "\nexport const fastReader = '" + fast + "'\n";
+}
+assets.set('reader-profile.js', Buffer.from(profile));
 
 const digest = createHash('sha256').update(template);
 for (const [name, bytes] of assets) {
@@ -83,9 +97,34 @@ async function writeAsset(path, bytes) {
   }
 }
 
+async function readReaderModules(ui) {
+  const reader = await readFile(join(ui, 'reader.js'));
+  const dependencies = ['reader-host.js', 'reader-profile.js', 'viewer-theme.js'];
+  if (reader.includes("from './reader-scratch.js'")) dependencies.push('reader-scratch.js');
+  const modules = await Promise.all(dependencies.map(async name => [name, await readFile(join(ui, name))]));
+  return new Map([['reader.js', reader], ...modules]);
+}
+
+async function installFastReader(source) {
+  const index = await readFile(join(source, 'index.html'), 'utf8');
+  const revision = index.match(/<script type="module" src="\.\/ui\/([0-9a-f]{24})\/site\.js"/)?.[1];
+  if (!revision) throw new Error('The fast reader must be a prepared site release.');
+  const modules = await readReaderModules(join(source, 'ui', revision));
+  if (!/^export const threaded = false;?$/m.test(modules.get('reader-profile.js').toString('utf8')))
+    throw new Error('The fast reader must use the single-threaded coordinator.');
+  const loader = modules.get('reader.js').toString('utf8')
+    .match(/from '\.\.\/\.\.\/_framework\/(dotnet\.[0-9a-f]{24}\.js)'/)?.[1];
+  if (!loader) throw new Error('The fast reader is missing its versioned runtime import.');
+  await readFile(join(source, '_framework', loader));
+  const directory = 'fast-reader/' + revision;
+  const ui = directory + '/ui/' + revision;
+  await cp(join(source, '_framework'), join(root, directory, '_framework'), { recursive: true });
+  await Promise.all([...modules].map(([name, bytes]) => writeAsset(join(root, ui, name), bytes)));
+  return '../../' + ui + '/reader.js';
+}
+
 async function installFallback(source) {
   const manifest = join(root, 'fallback-reader.json');
-  const readerModules = ['reader.js', 'reader-host.js', 'reader-profile.js', 'viewer-theme.js'];
   let configuration;
   if (source) {
     const index = await readFile(join(source, 'index.html'), 'utf8');
@@ -102,10 +141,10 @@ async function installFallback(source) {
     if (paged !== Boolean(optional[1]))
       throw new Error('Publish the threaded and fallback readers with the same paging option.');
     const destination = join(root, 'fallback', revision);
-    const modules = await Promise.all(readerModules.map(name => readFile(join(ui, name))));
+    const modules = await readReaderModules(ui);
     await cp(join(source, '_framework'), join(destination, '_framework'), { recursive: true });
-    await Promise.all(readerModules.map((name, i) =>
-      writeAsset(join(destination, 'ui', revision, name), modules[i])));
+    await Promise.all([...modules].map(([name, bytes]) =>
+      writeAsset(join(destination, 'ui', revision, name), bytes)));
     configuration = { revision, paged };
   } else {
     const contents = await readFile(manifest, 'utf8').catch(error => {
@@ -120,8 +159,8 @@ async function installFallback(source) {
     throw new Error('Invalid fallback reader configuration.');
   const directory = `fallback/${revision}`;
   const ui = `${directory}/ui/${revision}`;
-  await Promise.all(readerModules.map(name => readFile(join(root, ui, name))));
-  const loader = (await readFile(join(root, ui, 'reader.js'), 'utf8'))
+  const modules = await readReaderModules(join(root, ui));
+  const loader = modules.get('reader.js').toString('utf8')
     .match(/from '\.\.\/\.\.\/_framework\/(dotnet\.[0-9a-f]{24}\.js)'/)?.[1];
   if (!loader) throw new Error('The fallback reader is missing its versioned runtime import.');
   await readFile(join(root, directory, '_framework', loader));

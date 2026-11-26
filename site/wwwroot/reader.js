@@ -1,20 +1,33 @@
 import './reader-host.js';
 import { dotnet } from './_framework/dotnet.js';
 import { pooledGc, threaded } from './reader-profile.js';
+import { bufferScratchFile } from './reader-scratch.js';
 import { viewerTheme } from './viewer-theme.js';
 
 const memoryError = /garbage collector could not allocate|failed to allocate memory for the lock free allocator|out of memory|outofmemoryexception|cannot enlarge memory|could not allocate \d+.* bytes/i;
 // Release versions of Mono can report the eglib allocation failure with its text stripped.
 const monoAllocatorError = /\[MONO\] [^\r\n]*\/eglib\/gmem\.c:\d+ <disabled>/;
 const runtimeTrap = /memory access out of bounds/;
-const inputWindowSize = 64 * 1024;
-const inputWindowCount = 256;
+const inputCacheBytes = 16 * 1024 * 1024;
+const scratchCacheBytes = 512 * 1024 * 1024;
 const localizedErrors = new Set([
   'emptyFile', 'chooseRvtNwc', 'view.noGeometry', 'view.pageFailed',
   'view.profileMissing', 'view.scratchFailed', 'view.rangeRead', 'view.outOfRange',
 ]);
 
 const dropScript = `<script>
+  function reportFirstFrame() {
+    const error = document.getElementById('ioviewer-message');
+    if (error && !error.hidden) {
+      parent.postMessage({ type: 'ioviewer-page-error', error: error.textContent }, '*');
+    } else if (window.__ioviewer?.ready) {
+      window.__ioviewer.ready.then(() => parent.postMessage({ type: 'ioviewer-page-ready' }, '*'));
+    } else {
+      requestAnimationFrame(reportFirstFrame);
+    }
+  }
+  requestAnimationFrame(reportFirstFrame);
+
   window.addEventListener('dragover', event => {
     if (!event.dataTransfer.types.includes('Files')) return;
     event.preventDefault();
@@ -63,11 +76,13 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
 
   let result;
   try {
+    const isRvt = /\.rvt$/i.test(file.name);
     if (scratchDirectory && globalThis.FileSystemFileHandle?.prototype.createSyncAccessHandle) {
       try {
+        const budget = isRvt && pooledGc ? { available: scratchCacheBytes } : null;
         for (const name of ['partitions', 'triangles']) {
           const handle = await scratchDirectory.getFileHandle(name, { create: true });
-          scratch.push(await handle.createSyncAccessHandle());
+          scratch.push(bufferScratchFile(await handle.createSyncAccessHandle(), budget));
         }
       } catch (error) {
         if (!['SecurityError', 'NotAllowedError', 'NotSupportedError'].includes(error.name)) throw error;
@@ -79,6 +94,8 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
     let triangles = 0;
     let html;
     let failure;
+    const inputWindowSize = (isRvt ? 512 : 64) * 1024;
+    const inputWindowCount = inputCacheBytes / inputWindowSize;
     const inputWindows = new Map();
     let totalInputBytes = 0;
     let maxWindowBytes = 0;
@@ -93,7 +110,7 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
       dotnet.withRuntimeOptions(['--no-jiterpreter-traces-enabled']);
     }
     // Mono's WebAssembly heap cannot shrink. Collect temporary RVT decode data before growing it.
-    const runtime = /\.rvt$/i.test(file.name)
+    const runtime = isRvt
       ? dotnet.withEnvironmentVariable('MONO_GC_PARAMS', pooledGc ? 'soft-heap-limit=512m,nursery-size=16m' : 'soft-heap-limit=512m')
       : dotnet;
     const { getAssemblyExports, getConfig, localHeapViewU8, Module, setModuleImports } = await runtime.create();
@@ -204,10 +221,12 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
     if (failure) throw failure;
     if (bytes?.length) html = viewerPage(bytes);
     if (!(triangles > 0) && !html) throw new Error('view.pageFailed');
+    if (triangles > 0) scratch[0].commit?.();
     result = { warnings, errors, ...(triangles > 0 ? { triangles } : { html }) };
   } catch (error) {
     const detail = error?.message;
     const outOfMemory = exhaustedMemory || memoryError.test(detail ?? '');
+    exhaustedStorage ||= error?.name === 'QuotaExceededError' || /no space available/i.test(detail ?? '');
     if (exhaustedStorage)
       result = { localized: { key: 'view.storage' } };
     else if (outOfMemory)

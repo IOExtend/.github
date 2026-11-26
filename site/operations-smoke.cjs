@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const { readFile } = require('node:fs/promises');
+const { basename } = require('node:path');
 const { chromium } = require('playwright');
 
 const [url, nwc, rvt, target, downgradeSource = rvt] = process.argv.slice(2);
@@ -9,6 +10,7 @@ const origin = new URL(url).origin;
 
 async function select(page, route, path) {
   await page.goto(url + '#' + route);
+  await page.locator(`#app[data-mode="${route}"]`).waitFor();
   await page.locator('#operation-input').setInputFiles(path);
   const file = await page.locator('#operation-file').textContent();
   assert(file.toLowerCase().endsWith(route === 'export' && path === nwc ? '.nwc' : '.rvt'));
@@ -56,6 +58,10 @@ async function download(page, selector) {
     const context = await browser.newContext({ acceptDownloads: true, locale: 'ru-RU' });
     const errors = [];
     const outside = [];
+    const readerRequests = [];
+    context.on('request', request => {
+      if (new URL(request.url()).pathname.endsWith('/reader.js')) readerRequests.push(request.url());
+    });
     await context.route('**/*', route => {
       const request = route.request();
       if (new URL(request.url()).origin === origin && request.method() === 'GET') return route.continue();
@@ -64,7 +70,24 @@ async function download(page, selector) {
     });
     const page = await context.newPage();
     page.on('pageerror', error => errors.push(error.message));
-    await select(page, 'export', nwc);
+    await page.goto(url + '#export');
+    await page.locator('#operation-drop').evaluate((target, { name, bytes }) => {
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(new File([Uint8Array.from(atob(bytes), char => char.charCodeAt(0))], name));
+      target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }));
+    }, { name: basename(nwc), bytes: (await readFile(nwc)).toString('base64') });
+    assert.equal(await page.locator('#operation-file').textContent(), basename(nwc));
+    assert(await page.locator('#workspace').isHidden());
+    await page.getByRole('link', { name: 'Версия Revit' }).click();
+    await page.locator('#downgrade-settings').waitFor();
+    assert.equal(await page.locator('#operation-file').textContent(), basename(nwc));
+    assert(await page.locator('#run-operation').isDisabled());
+    assert(await page.locator('#workspace').isHidden());
+    assert.deepEqual(readerRequests, []);
+    await page.getByRole('link', { name: 'Просмотр' }).click();
+    await page.locator('#model-name').getByText(basename(nwc), { exact: true }).waitFor();
+    assert(readerRequests.length > 0);
+    await page.getByRole('link', { name: 'Экспорт' }).click();
     await page.locator('input[value=glb]').check();
     await page.locator('input[value=json]').check();
     await observeProgress(page);
@@ -139,7 +162,7 @@ async function download(page, selector) {
     await page.locator('#operation-progress').waitFor({ state: 'hidden' });
     await page.getByRole('link', { name: 'Экспорт' }).click();
     await page.locator('#operation-progress').waitFor();
-    await page.getByRole('button', { name: 'Отменить' }).click();
+    await page.locator('#cancel-operation').click();
     await page.locator('#operation-status').getByText('Обработка отменена.').waitFor();
     assert(await page.locator('#operation-progress').isHidden());
     assert(await page.locator('#run-operation').isEnabled());
@@ -154,7 +177,7 @@ async function download(page, selector) {
     assert(await page.locator('#operation-progress').isHidden());
 
     await page.getByRole('link', { name: 'Просмотр' }).click();
-    await page.getByRole('heading', { name: 'Перетащите модель' }).waitFor();
+    await page.locator('#status[data-error]').getByText('Не удалось открыть модель.', { exact: false }).waitFor();
     assert.deepEqual(outside, []);
     assert.deepEqual(errors, []);
     console.log('Invalid metadata clears the previous version choices, the preview route remains usable, and model data stays local.');

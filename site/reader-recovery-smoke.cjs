@@ -43,8 +43,12 @@ async function test(url, isolated, fault) {
         return route.fulfill({ response, body: source.replace(begin, `${begin}\nthrow new ${failure};`) });
       }
       if (isFallback && mode === 'missing') return route.abort();
-      if (isFallback ? mode === 'waiting' : mode === 'startup')
-        return route.fulfill({ response: await route.fetch(), body: 'self.onmessage = () => {};' });
+      if (isFallback ? ['waiting', 'ready'].includes(mode) : mode === 'startup') {
+        const key = mode === 'ready' ? 'view.check' : 'view.checkBytes';
+        const progress = { percent: 5, key, completed: 1 };
+        return route.fulfill({ response: await route.fetch(),
+          body: `self.onmessage = () => self.postMessage(${JSON.stringify({ progress })});` });
+      }
       return route.continue();
     });
     page.on('pageerror', error => errors.push(error.message));
@@ -72,6 +76,7 @@ async function test(url, isolated, fault) {
     await input.setInputFiles(rvt);
     if (starting) {
       await starting;
+      await status.getByText('прочитано 1 МиБ', { exact: false }).waitFor();
       await page.clock.fastForward(61_000);
     }
     if (isolated) await status.getByText('Повторяем открытие в однопоточном режиме', { exact: false }).waitFor({ timeout: 60000 });
@@ -89,21 +94,39 @@ async function test(url, isolated, fault) {
     assert.equal(fallback.length, isolated ? 1 : 2, 'The model is retried exactly once');
     const displayed = await scratch();
     assert.equal(displayed.length, 1, 'The failed attempt released its storage');
+    const waitForScratchCleanup = () => page.waitForFunction(async expected => {
+      const root = await navigator.storage.getDirectory();
+      const names = (await Array.fromAsync(root.keys())).filter(name => name.startsWith('ioviewer-open-'));
+      return names.length === 1 && names[0] === expected;
+    }, displayed[0]);
 
-    mode = 'waiting';
+    mode = 'ready';
     const replacement = page.waitForEvent('worker', {
       predicate: worker => worker.url().includes('/fallback/'),
     });
     await input.setInputFiles(rvt);
     await replacement;
+    await status.getByText(`Проверяем файл · ${name}`, { exact: true }).waitFor();
+    if (starting) {
+      await page.clock.fastForward(61_000);
+      assert(!(await failed.isVisible()), 'Reading remains active after the startup deadline');
+    }
     await cancel.waitFor();
     await cancel.click();
     await cancel.waitFor({ state: 'hidden' });
-    await page.waitForFunction(async expected => {
-      const root = await navigator.storage.getDirectory();
-      const names = (await Array.fromAsync(root.keys())).filter(name => name.startsWith('ioviewer-open-'));
-      return names.length === 1 && names[0] === expected;
-    }, displayed[0]);
+    await waitForScratchCleanup();
+
+    if (starting) {
+      const fallbackRequests = fallback.length;
+      mode = 'waiting';
+      await input.setInputFiles(rvt);
+      await status.getByText('прочитано 1 МиБ', { exact: false }).waitFor();
+      await page.clock.fastForward(61_000);
+      await failed.waitFor({ timeout: 10000 });
+      assert.equal(fallback.length, fallbackRequests + 1, 'A stalled fallback ends the request');
+      assert(await handle.evaluate(element => element === document.querySelector('#viewer')));
+      await waitForScratchCleanup();
+    }
 
     const fallbackRequests = fallback.length;
     mode = 'missing';

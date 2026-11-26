@@ -27,6 +27,11 @@ try {
   const view = globalThis.__ioviewerMeshLod;
   if (!view) throw new Error(document.querySelector('#ioviewer-message').textContent || 'WebGL недоступен.');
   await view.ready;
+  while (view.stats().triangles === 0) {
+    const message = document.querySelector('#ioviewer-message');
+    if (!message.hidden) throw new Error(message.textContent);
+    await new Promise(resolve => requestAnimationFrame(resolve));
+  }
   parent.postMessage({ type: 'ioviewer-page-ready' }, '*');
 } catch (error) {
   parent.postMessage({ type: 'ioviewer-page-error', error: error.message }, '*');

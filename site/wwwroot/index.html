@@ -9,7 +9,6 @@
   <link rel="stylesheet" href="./site.css">
   <link rel="stylesheet" href="./operations.css">
   <script type="module" src="./site.js"></script>
-  <script type="module" src="./operations.js"></script>
 </head>
 <body>
   <header class="site-header">
@@ -24,11 +23,15 @@
       </nav>
       <div class="header-actions">
         <a class="source-link" href="https://github.com/IOExtend">GitHub</a>
-        <select id="site-language" aria-label="Язык"></select>
+        <div class="language-control">
+          <span class="language-globe" aria-hidden="true"></span>
+          <select id="site-language" aria-label="Язык"></select>
+        </div>
       </div>
     </div>
   </header>
-  <main id="workspace">
+  <main id="app" data-mode="view">
+  <section id="workspace" aria-label="3D-просмотр модели" data-i18n="viewerTitle" data-i18n-attr="aria-label">
     <div id="status-bar">
       <div id="status-content">
         <p id="status" role="status"></p>
@@ -38,7 +41,7 @@
           <span id="open-elapsed"></span>
         </div>
       </div>
-      <button id="cancel" type="button" data-i18n="cancel" hidden>Отменить</button>
+      <button id="cancel" type="button" data-i18n="cancel" aria-describedby="status" hidden>Отменить</button>
     </div>
     <div id="drop-area">
       <div class="drop-content">
@@ -58,8 +61,8 @@
     </div>
     <iframe id="viewer" class="viewer-frame" title="3D-просмотр модели" data-i18n="viewerTitle" data-i18n-attr="title" sandbox="allow-scripts" hidden></iframe>
     <input id="file-input" type="file" accept=".rvt,.nwc" hidden>
-  </main>
-  <main id="operations" hidden>
+  </section>
+  <section id="operations" aria-labelledby="operation-title" hidden>
     <div class="operation-heading">
       <h1 id="operation-title"></h1>
       <p id="operation-description"></p>
@@ -99,7 +102,7 @@
         </div>
         <div class="operation-actions">
           <button id="run-operation" type="submit" disabled></button>
-          <button id="cancel-operation" class="secondary" type="button" data-i18n="cancel" hidden>Отменить</button>
+          <button id="cancel-operation" class="secondary" type="button" data-i18n="cancel" aria-describedby="operation-phase" hidden>Отменить</button>
         </div>
         <section id="operation-progress" aria-label="Ход обработки" data-i18n="operationProgress" data-i18n-attr="aria-label" hidden>
           <div class="operation-progress-row">
@@ -121,6 +124,7 @@
       <h2 id="results-title" data-i18n="results">Результаты</h2>
       <ul id="operation-downloads"></ul>
     </section>
+  </section>
   </main>
 </body>
 </html>

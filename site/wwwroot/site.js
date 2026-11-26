@@ -1,8 +1,10 @@
 import { formatNumber, lang, localize, message, setupLanguage, t } from './i18n.js';
+import { isModelSelectionLocked, selectModelFile } from './operations.js';
 import * as readerProfile from './reader-profile.js';
 
-const { fallbackReader, threaded } = readerProfile;
+const { fallbackReader, fastReader, threaded } = readerProfile;
 
+const app = document.querySelector('#app');
 const workspace = document.querySelector('#workspace');
 const dropArea = document.querySelector('#drop-area');
 const input = document.querySelector('#file-input');
@@ -17,9 +19,19 @@ const elapsedLabel = document.querySelector('#open-elapsed');
 const modelBar = document.querySelector('#model-bar');
 const modelName = document.querySelector('#model-name');
 let viewer = document.querySelector('#viewer');
-const threadedStartupTimeout = 60_000;
+const readerStartupTimeout = 60_000;
+const fastOpenIdleTimeout = 25_000;
+const fastReaderMaxBytes = 50 * 1024 * 1024;
+const fastReaderSupported = fastReader && navigator.deviceMemory >= 8 && navigator.hardwareConcurrency >= 5;
+const useViewerIsolation = threaded || fastReaderSupported;
+
+function canUseFastReader(file) {
+  return fastReaderSupported && /\.rvt$/i.test(file.name) && file.size <= fastReaderMaxBytes &&
+    crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined';
+}
 
 let opening;
+let pendingFile;
 let displayedScratch;
 let displayedFiles;
 let elapsedTimer;
@@ -29,13 +41,13 @@ let statusText;
 let readerPath = './reader.js';
 let stopIsolationReload;
 
-if (threaded && !crossOriginIsolated && navigator.serviceWorker && !navigator.serviceWorker.controller) {
+if (useViewerIsolation && !crossOriginIsolated && navigator.serviceWorker && !navigator.serviceWorker.controller) {
   const reload = () => location.reload();
   stopIsolationReload = () => navigator.serviceWorker.removeEventListener('controllerchange', reload);
   navigator.serviceWorker.addEventListener('controllerchange', reload, { once: true });
   navigator.serviceWorker.register(new URL('../../thread-isolation.js', import.meta.url)).catch(error => {
     stopIsolationReload();
-    console.warn('Could not enable threaded viewer isolation.', error);
+    console.warn('Could not enable viewer isolation.', error);
   });
 }
 
@@ -63,11 +75,15 @@ function startOpeningProgress() {
 function finish(open) {
   if (opening !== open) return;
   opening = undefined;
-  openButton.disabled = replaceButton.disabled = false;
+  updateOpenButtons();
   cancelButton.hidden = true;
   clearInterval(elapsedTimer);
   openingProgress.hidden = true;
   syncViewerLanguage();
+}
+
+function updateOpenButtons() {
+  openButton.disabled = replaceButton.disabled = Boolean(opening) || isModelSelectionLocked();
 }
 
 function showProgress(open, { percent, key, completed, total, level, label }) {
@@ -133,7 +149,7 @@ async function cleanAbandonedScratch() {
   }
 }
 
-function runWorker(open, path, data, startupTimeout) {
+function runWorker(open, path, data, startupTimeout, idleTimeout) {
   const { signal } = open.controller;
   signal.throwIfAborted();
   return new Promise((resolve, reject) => {
@@ -145,6 +161,7 @@ function runWorker(open, path, data, startupTimeout) {
     catch (error) { reject(failed(error)); return; }
     function settle(callback, value) {
       clearTimeout(startup);
+      clearTimeout(inactivity);
       signal.removeEventListener('abort', abort);
       worker.onmessage = worker.onmessageerror = worker.onerror = null;
       worker.terminate();
@@ -156,10 +173,19 @@ function runWorker(open, path, data, startupTimeout) {
       event.preventDefault();
       settle(reject, failed());
     };
+    let lastProgress;
     worker.onmessage = ({ data: result }) => {
-      clearTimeout(startup);
-      if (result?.progress) {
-        showProgress(open, result.progress);
+      const progress = result?.progress;
+      if (progress) {
+        if (progress.key === 'view.check') clearTimeout(startup);
+        if (idleTimeout && (!lastProgress || progress.percent > lastProgress.percent ||
+            (progress.percent === lastProgress.percent && progress.key === lastProgress.key &&
+              progress.completed > (lastProgress.completed ?? 0)))) {
+          lastProgress = progress;
+          clearTimeout(inactivity);
+          inactivity = setTimeout(timedOut, idleTimeout);
+        }
+        showProgress(open, progress);
         return;
       }
       if (result?.error || result?.localized)
@@ -168,7 +194,9 @@ function runWorker(open, path, data, startupTimeout) {
         }));
       else if (result?.html || result?.triangles || result?.files) settle(resolve, result);
     };
-    const startup = startupTimeout && setTimeout(() => settle(reject, failed()), startupTimeout);
+    const timedOut = () => settle(reject, failed());
+    const startup = startupTimeout && setTimeout(timedOut, startupTimeout);
+    let inactivity = idleTimeout && setTimeout(timedOut, idleTimeout);
     try { worker.postMessage(data); }
     catch (error) { settle(reject, error); }
   });
@@ -198,14 +226,14 @@ function setViewerSource(frame, source) {
 const pagedViewerUrl = new URL('./paged-viewer.html', import.meta.url);
 
 function syncViewerLanguage() {
-  if (opening || viewer.hidden || viewer.dataset.locale === lang) return;
+  if (opening || workspace.hidden || viewer.hidden || viewer.dataset.locale === lang) return;
   const frame = viewer.cloneNode(false);
   setViewerSource(frame, modelUrl ?? pagedViewerUrl);
   viewer.replaceWith(frame);
   viewer = frame;
 }
 
-function stagePagedFrame(open, files) {
+function stageFrame(open, files, deadline) {
   const { signal } = open.controller;
   signal.throwIfAborted();
   const frame = viewer.cloneNode(false);
@@ -217,6 +245,7 @@ function stagePagedFrame(open, files) {
   open.frame = frame;
   return new Promise((resolve, reject) => {
     function settle(callback, value) {
+      clearTimeout(timer);
       signal.removeEventListener('abort', abort);
       frame.onerror = null;
       window.removeEventListener('message', receive);
@@ -227,7 +256,7 @@ function stagePagedFrame(open, files) {
       if (event.source !== frame.contentWindow || event.origin !== 'null') return;
       switch (event.data?.type) {
         case 'ioviewer-page-request':
-          frame.contentWindow.postMessage({ type: 'ioviewer-pages', files }, '*');
+          if (files) frame.contentWindow.postMessage({ type: 'ioviewer-pages', files }, '*');
           break;
         case 'ioviewer-page-ready':
           settle(resolve, frame);
@@ -238,14 +267,16 @@ function stagePagedFrame(open, files) {
       }
     }
     signal.addEventListener('abort', abort, { once: true });
-    frame.onerror = () => settle(reject, Object.assign(new Error(), { localized: message('view.pageFailed') }));
+    const failed = detail => settle(reject, Object.assign(new Error(detail), { localized: message('view.pageFailed') }));
+    frame.onerror = () => failed('Viewer iframe failed to load.');
+    const timer = deadline && setTimeout(() => failed('Viewer iframe did not report readiness.'), deadline);
     window.addEventListener('message', receive);
     viewer.after(frame);
   });
 }
 
-async function openFile(file) {
-  if (!(file instanceof File) || opening) return;
+function selectViewerFile(file) {
+  if (!(file instanceof File) || opening || isModelSelectionLocked()) return;
   if (!/\.(rvt|nwc)$/i.test(file.name)) {
     showStatus(message('chooseRvtNwc'), true);
     return;
@@ -255,8 +286,22 @@ async function openFile(file) {
     showStatus(message('emptyFile'), true);
     return;
   }
+  selectModelFile(file);
+}
 
-  stopIsolationReload?.();
+async function openFile(file) {
+  const started = performance.now();
+  const canPreview = /\.(rvt|nwc)$/i.test(file.name);
+  if (!canPreview) {
+    viewer.hidden = modelBar.hidden = true;
+    dropArea.hidden = false;
+    viewer.removeAttribute('src');
+    if (modelUrl) URL.revokeObjectURL(modelUrl);
+    disposeScratch(displayedScratch);
+    modelUrl = displayedScratch = displayedFiles = undefined;
+    showStatus(() => `${file.name} · ${t('chooseRvtNwc')}`);
+    return;
+  }
   if (threaded && (!crossOriginIsolated || typeof SharedArrayBuffer === 'undefined')) {
     if (!fallbackReader) {
       showStatus(message('workerFailed'), true);
@@ -264,67 +309,80 @@ async function openFile(file) {
     }
     readerPath = fallbackReader;
   }
-  document.dispatchEvent(new CustomEvent('viewer-model-selected', { detail: file }));
   const open = { file, controller: new AbortController() };
   opening = open;
   showStatus(message('loadKernel'));
-  openButton.disabled = replaceButton.disabled = true;
+  updateOpenButtons();
   cancelButton.hidden = false;
   startOpeningProgress();
 
   try {
-    let scratchDirectory = await prepareScratch(open);
-    let result;
-    try {
-      result = await runWorker(open, readerPath, { file, scratchDirectory },
-        fallbackReader && readerPath !== fallbackReader ? threadedStartupTimeout : undefined);
-    } catch (error) {
-      open.controller.signal.throwIfAborted();
-      if (!fallbackReader || readerPath === fallbackReader || !error.retryable) throw error;
-      readerPath = fallbackReader;
-      open.recovering = true;
-      openingMeter.value = 0;
-      showProgress(open, { percent: 0, key: 'loadKernel' });
-      await disposeScratch(open.scratch);
-      open.scratch = undefined;
-      open.controller.signal.throwIfAborted();
-      scratchDirectory = await prepareScratch(open);
-      result = await runWorker(open, readerPath, { file, scratchDirectory });
+    let scratchDirectory, result, frame;
+    if (canUseFastReader(file)) {
+      try {
+        const fastResult = await runWorker(open, fastReader, { file }, readerStartupTimeout, fastOpenIdleTimeout);
+        if (!fastResult.html || fastResult.errors) throw new Error('Fast reader did not produce a complete view.');
+        open.url = URL.createObjectURL(fastResult.html);
+        frame = await stageFrame(open, undefined, fastOpenIdleTimeout);
+        result = fastResult;
+      } catch (error) {
+        open.controller.signal.throwIfAborted();
+        open.frame?.remove();
+        if (open.url) URL.revokeObjectURL(open.url);
+        open.frame = open.url = undefined;
+        console.debug('IOExtend fast reader fallback', error.message || error.localized);
+        openingMeter.value = 0;
+        showProgress(open, { percent: 0, key: 'loadKernel' });
+      }
     }
-    let frame, pagesFiles;
+    if (!result) {
+      scratchDirectory = await prepareScratch(open);
+      try {
+        result = await runWorker(open, readerPath, { file, scratchDirectory }, readerStartupTimeout);
+      } catch (error) {
+        open.controller.signal.throwIfAborted();
+        if (!fallbackReader || readerPath === fallbackReader || !error.retryable) throw error;
+        readerPath = fallbackReader;
+        open.recovering = true;
+        openingMeter.value = 0;
+        showProgress(open, { percent: 0, key: 'loadKernel' });
+        await disposeScratch(open.scratch);
+        open.scratch = undefined;
+        open.controller.signal.throwIfAborted();
+        scratchDirectory = await prepareScratch(open);
+        result = await runWorker(open, readerPath, { file, scratchDirectory }, readerStartupTimeout);
+      }
+    }
+    let pagesFiles;
     if (result.triangles) {
       showProgress(open, { percent: 97, key: 'view.preparePages', completed: result.triangles });
       const { files, pages, html } = await runWorker(open, './mesh-pages-worker.js', {
         scratchDirectory, triangles: result.triangles,
-        inlineViewer: threaded && Boolean(navigator.serviceWorker?.controller),
+        inlineViewer: useViewerIsolation && Boolean(navigator.serviceWorker?.controller),
       });
       showProgress(open, { percent: 99, key: 'view.openPages', completed: pages });
       pagesFiles = files;
       if (html) open.url = URL.createObjectURL(html);
-      frame = await stagePagedFrame(open, files);
+    } else if (!frame) {
+      open.url = URL.createObjectURL(result.html);
     }
+    frame ??= await stageFrame(open, pagesFiles);
     open.controller.signal.throwIfAborted();
+    performance.measure('ioextend:first-frame', { start: started });
 
     const oldScratch = displayedScratch;
     const oldUrl = modelUrl;
-    if (frame) {
-      viewer.remove();
-      viewer = frame;
-      viewer.id = 'viewer';
-      viewer.classList.remove('viewer-loading');
-      viewer.inert = false;
-      displayedScratch = open.scratch;
-      displayedFiles = pagesFiles;
-      open.scratch = undefined;
-      open.frame = undefined;
-      modelUrl = open.url;
-      open.url = undefined;
-    } else {
-      modelUrl = URL.createObjectURL(result.html);
-      setViewerSource(viewer, modelUrl);
-      displayedScratch = undefined;
-      displayedFiles = undefined;
-    }
+    viewer.remove();
+    viewer = frame;
+    viewer.id = 'viewer';
+    viewer.classList.remove('viewer-loading');
+    viewer.inert = false;
+    displayedScratch = pagesFiles ? open.scratch : undefined;
+    if (pagesFiles) open.scratch = undefined;
+    displayedFiles = pagesFiles;
+    open.frame = undefined;
+    modelUrl = open.url;
+    open.url = undefined;
     if (oldUrl) URL.revokeObjectURL(oldUrl);
     disposeScratch(oldScratch);
     viewer.hidden = modelBar.hidden = false;
@@ -353,7 +411,7 @@ for (const button of [openButton, replaceButton]) {
 }
 
 input.addEventListener('change', () => {
-  openFile(input.files[0]);
+  selectViewerFile(input.files[0]);
   input.value = '';
 });
 
@@ -367,9 +425,9 @@ cancelButton.addEventListener('click', () => {
 });
 
 function openDrop(files) {
-  if (workspace.hidden || opening) return;
+  if (workspace.hidden || opening || isModelSelectionLocked()) return;
   if (files.length > 1) showStatus(message('oneViewerFile'), true);
-  else openFile(files[0]);
+  else selectViewerFile(files[0]);
 }
 
 window.addEventListener('message', event => {
@@ -380,10 +438,10 @@ window.addEventListener('message', event => {
 });
 
 window.addEventListener('dragenter', event => {
-  if (workspace.hidden || !event.dataTransfer.types.includes('Files')) return;
+  if (app.dataset.mode !== 'view' || !event.dataTransfer.types.includes('Files')) return;
   event.preventDefault();
   dragDepth++;
-  workspace.classList.add('dragging');
+  if (!opening && !isModelSelectionLocked()) workspace.classList.add('dragging');
 });
 
 window.addEventListener('dragleave', () => {
@@ -391,13 +449,13 @@ window.addEventListener('dragleave', () => {
 });
 
 window.addEventListener('dragover', event => {
-  if (workspace.hidden || !event.dataTransfer.types.includes('Files')) return;
+  if (app.dataset.mode !== 'view' || !event.dataTransfer.types.includes('Files')) return;
   event.preventDefault();
-  event.dataTransfer.dropEffect = opening ? 'none' : 'copy';
+  event.dataTransfer.dropEffect = opening || isModelSelectionLocked() ? 'none' : 'copy';
 });
 
 window.addEventListener('drop', event => {
-  if (workspace.hidden || !event.dataTransfer.types.includes('Files')) return;
+  if (app.dataset.mode !== 'view' || !event.dataTransfer.types.includes('Files')) return;
   event.preventDefault();
   dragDepth = 0;
   workspace.classList.remove('dragging');
@@ -415,5 +473,27 @@ document.addEventListener('localechange', () => {
   opening?.updateElapsed?.();
   syncViewerLanguage();
 });
+function openPendingFile() {
+  if (workspace.hidden) return;
+  if (!pendingFile) {
+    syncViewerLanguage();
+    return;
+  }
+  const file = pendingFile;
+  pendingFile = undefined;
+  openFile(file);
+}
+
+document.addEventListener('model-file-selected', ({ detail: file }) => {
+  stopIsolationReload?.();
+  if (opening) {
+    opening.controller.abort();
+    finish(opening);
+  }
+  pendingFile = file;
+  openPendingFile();
+});
+document.addEventListener('view-activated', openPendingFile);
+document.addEventListener('operation-statechange', updateOpenButtons);
 setupLanguage();
 cleanAbandonedScratch();
