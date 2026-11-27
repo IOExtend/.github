@@ -68,6 +68,9 @@ async function main() {
       frameMs: performance.getEntriesByName('smoke:visible-frame').at(-1).duration,
     }));
     assert(Number.isFinite(readyMs) && readyMs > 0 && frameMs >= readyMs, 'Invalid visible-frame timing');
+    const wasm = requests.filter(path => /\/dotnet\.native\.[a-z0-9]+\.wasm$/.test(path));
+    assert(wasm.length === 1 && wasm[0].includes('/fast-reader/'),
+      `Expected only the fast reader for the visible frame at ${Math.round(frameMs)} ms. WASM requests: ${wasm.join(', ')}`);
     const viewer = page.frameLocator('#viewer[src^="blob:"]');
     await viewer.locator('#ioviewer-canvas').waitFor({ state: 'visible' });
     assert(await viewer.locator('#ioviewer-message').isHidden(), 'IOViewer reported a model or WebGL error');
@@ -98,9 +101,6 @@ async function main() {
       return 0;
     });
     assert.equal(groups, 3, 'Expected three property groups in IOViewer');
-    const wasm = requests.filter(path => /\/dotnet\.native\.[a-z0-9]+\.wasm$/.test(path));
-    assert.equal(wasm.length, 1, 'Expected a single WASM download');
-    assert(wasm[0].includes('/fast-reader/'), 'The page opened through the fallback reader');
     console.log(JSON.stringify({ chromium: browser.version(), firstFrameMs: Math.round(frameMs), viewerReadyMs: Math.round(readyMs),
       elements: counts[0], instances: counts[1], packagedGeometries: counts[2], groups, geometryHash, nativeGeometryHash }));
   } finally {

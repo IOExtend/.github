@@ -5,9 +5,11 @@ using IOViewer.Exporters;
 #if LOCAL_MESH_PAGES
 using IOViewer.Model;
 #endif
+#if !FAST_RVT_READER
 using NwcIO;
 using NwcIO.Model;
 using NwcIO.Scene;
+#endif
 using RvtIO;
 using RvtIO.Scene;
 
@@ -60,15 +62,17 @@ internal static partial class Program
             throw new InvalidDataException("emptyFile");
 
         string extension = Path.GetExtension(name).ToLowerInvariant();
-        if (extension is not (".rvt" or ".nwc"))
-            throw new InvalidDataException("chooseRvtNwc");
-
         using var stream = new BrowserFileStream(length);
         using var triangleScratch = extension == ".rvt" && useScratch
             ? new BufferedStream(new BrowserScratchStream(triangles: true), 64 * 1024) : null;
-        (SceneDocument scene, IReadOnlyList<SceneDiagnostic> diagnostics) = extension == ".rvt"
-            ? ReadRvt(stream, name, triangleScratch)
-            : ReadNwc(stream, name);
+        var (scene, diagnostics) = extension switch
+        {
+            ".rvt" => ReadRvt(stream, name, triangleScratch),
+#if !FAST_RVT_READER
+            ".nwc" => ReadNwc(stream, name),
+#endif
+            _ => throw new InvalidDataException("chooseRvtNwc"),
+        };
 
         if (scene.Instances.Count == 0)
             throw new InvalidDataException("view.noGeometry");
@@ -151,6 +155,7 @@ internal static partial class Program
         ReportProgress(percent, "view.rvtScene", update.Completed, update.Total);
     }
 
+#if !FAST_RVT_READER
     private static (SceneDocument, IReadOnlyList<SceneDiagnostic>) ReadNwc(Stream stream, string name)
     {
         ReportProgress(8, "view.nwcContainer");
@@ -159,6 +164,7 @@ internal static partial class Program
         var result = NwcSceneReader.Read(document, new NwcSceneOptions { ModelKey = name });
         return (result.Document, result.Diagnostics);
     }
+#endif
 
     private static void ReportRvtProgress(RvtReadProgress update)
     {
@@ -257,6 +263,7 @@ internal static partial class Program
         ? start
         : start + (int)((end - start) * (update.Completed / (double)update.Total));
 
+#if !FAST_RVT_READER
     private static void ReportNwcProgress(NwcProgress update)
     {
         switch (update.Phase)
@@ -266,6 +273,7 @@ internal static partial class Program
             case "open": ReportProgress(92, "view.nwcScene"); break;
         }
     }
+#endif
 
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
     {

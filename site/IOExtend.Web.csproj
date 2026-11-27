@@ -7,9 +7,12 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PublishTrimmed>false</PublishTrimmed>
     <WasmBuildNative>false</WasmBuildNative>
+    <IOExtendAot Condition="'$(IOExtendFastReader)' == 'true'">true</IOExtendAot>
+    <DefineConstants Condition="'$(IOExtendFastReader)' == 'true'">$(DefineConstants);FAST_RVT_READER</DefineConstants>
+    <_BuildPagedViewer Condition="'$(IOViewerSource)' != '' and '$(IOExtendFastReader)' != 'true'">true</_BuildPagedViewer>
     <RvtIOProgressSource Condition="'$(RvtIOProgressSource)' == ''">../RvtIO</RvtIOProgressSource>
     <DefineConstants Condition="'$(RvtIOPartitionScratch)' != 'false'">$(DefineConstants);RVT_PARTITION_SCRATCH</DefineConstants>
-    <DefineConstants Condition="'$(IOViewerSource)' != ''">$(DefineConstants);LOCAL_MESH_PAGES</DefineConstants>
+    <DefineConstants Condition="'$(_BuildPagedViewer)' == 'true'">$(DefineConstants);LOCAL_MESH_PAGES</DefineConstants>
     <DefaultItemExcludes>$(DefaultItemExcludes);operations/**;wwwroot/paged-viewer.html;wwwroot/paged-storage.js</DefaultItemExcludes>
     <DefaultItemExcludes Condition="'$(IOExtendThreaded)' != 'true'">$(DefaultItemExcludes);wwwroot/thread-isolation.js</DefaultItemExcludes>
   </PropertyGroup>
@@ -19,6 +22,7 @@
     <RunAOTCompilation>true</RunAOTCompilation>
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>partial</TrimMode>
+    <TrimMode Condition="'$(IOExtendFastReader)' == 'true'">full</TrimMode>
     <EmccInitialHeapSize>33554432</EmccInitialHeapSize>
     <EmccMaximumHeapSize>4294901760</EmccMaximumHeapSize>
     <EmccExtraLDFlags>$(EmccExtraLDFlags) -sMALLOC=dlmalloc</EmccExtraLDFlags>
@@ -40,10 +44,10 @@
     <PackageReference Include="IOViewer" Version="0.3.1" Condition="'$(IOViewerSource)' == ''" />
     <ProjectReference Include="$(IOViewerSource)/src/IOViewer/IOViewer.csproj" Condition="'$(IOViewerSource)' != ''" />
     <ProjectReference Include="$(RvtIOProgressSource)/src/RvtIO.Scene/RvtIO.Scene.csproj" />
-    <PackageReference Include="NwcIO.Scene" Version="0.17.0" />
-    <Content Include="wwwroot/paged-viewer.html;wwwroot/paged-storage.js" Condition="'$(IOViewerSource)' != ''" />
+    <PackageReference Include="NwcIO.Scene" Version="0.17.0" Condition="'$(IOExtendFastReader)' != 'true'" />
+    <Content Include="wwwroot/paged-viewer.html;wwwroot/paged-storage.js" Condition="'$(_BuildPagedViewer)' == 'true'" />
   </ItemGroup>
-  <Target Name="BuildLocalMeshAssets" BeforeTargets="PrepareForBuild" Condition="'$(IOViewerSource)' != ''">
+  <Target Name="BuildLocalMeshAssets" BeforeTargets="PrepareForBuild" Condition="'$(_BuildPagedViewer)' == 'true'">
     <Exec Command="node &quot;$(MSBuildProjectDirectory)/build-paged-viewer.mjs&quot; &quot;$(IOViewerSource)&quot;" />
   </Target>
   <Target Name="PrepareWebRelease" AfterTargets="Publish">
@@ -53,6 +57,8 @@
           Command="node &quot;$(MSBuildProjectDirectory)/prepare-web-release.mjs&quot; &quot;$(PublishDir)wwwroot&quot; &quot;$(IOExtendFallbackSite)&quot;" />
   </Target>
   <Target Name="WriteReaderProfile" BeforeTargets="AssignTargetPaths">
+    <Error Condition="'$(IOExtendFastReader)' == 'true' and '$(IOExtendThreaded)' == 'true'"
+           Text="The fast reader bundle requires a single-threaded coordinator." />
     <Error Condition="'$(IOExtendThreaded)' == 'true' and '$(IOExtendAot)' != 'true'"
            Text="The threaded browser profile requires IOExtendAot=true." />
     <Error Condition="'$(IOExtendThreaded)' == 'true' and '$(IOExtendPooledGc)' == 'true'"

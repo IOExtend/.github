@@ -36,13 +36,17 @@ dotnet publish -c Release -o publish-web-aot -p:IOExtendAot=true -p:RvtIOProgres
 
 При сравнении с исходниками без API временного хранения из #308 передайте `-p:RvtIOPartitionScratch=false`. В этом режиме RvtIO держит распакованные сегменты в памяти, а IOViewer может записать готовую сцену в страницы. Для крупных RVT используйте сборку с временным хранилищем.
 
-Чтобы добавить быстрый режим для небольших RVT, подготовьте отдельную AOT-сборку, в которой воркер возвращает
-автономный HTML со сценой. Для неё используйте однопоточный координатор и соберите сайт без `IOViewerSource`,
-чтобы выбрать автономный вывод. Для основной сборки сохраните постраничный просмотр. Передайте оба каталога
-в скрипт подготовки релиза.
+Для небольших RVT профиль `IOExtendFastReader` собирает отдельный однопоточный AOT-воркер с полной обрезкой
+неиспользуемого кода. Воркер читает RVT и возвращает автономный HTML. Основная сборка обслуживает NWC,
+постраничный просмотр и резервное открытие RVT. Для сравнения с нативным экспортом передайте ту же ревизию
+IOViewer. Используйте отдельный каталог промежуточных файлов для каждого профиля, чтобы компоновщик применил
+параметры обрезки. В `RvtIOProgressSource` укажите исходники RvtIO с поддержкой однопоточного браузерного
+воркера. При проверке чистой ревизии `d6e7d8b` на образце Revit 2027 быстрый путь завершился с
+`Arg_PlatformNotSupported`, и сайт открыл модель через основной загрузчик.
 
 ```powershell
-node prepare-web-release.mjs publish-web-aot/wwwroot --fast-reader fast-reader-build/wwwroot
+dotnet publish IOExtend.Web.csproj -c Release --artifacts-path ../artifacts/fast-reader -o ../artifacts/fast-reader/publish -p:IOExtendFastReader=true -p:IOExtendPooledGc=true -p:RvtIOPartitionScratch=false -p:RvtIOProgressSource=/path/to/RvtIO -p:IOViewerSource=/path/to/IOViewer
+node prepare-web-release.mjs publish-web-aot/wwwroot --fast-reader ../artifacts/fast-reader/publish/wwwroot
 ```
 
 Рабочая страница выбирает быстрый воркер для RVT до 50 МиБ при изоляции источника, от 8 ГиБ памяти по данным браузера
