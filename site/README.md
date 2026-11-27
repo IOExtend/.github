@@ -65,6 +65,9 @@ git -C $readerCore cherry-pick --no-commit $browserFix
 через загрузчик .NET и передаёт полученные байты воркерам. Для этого профиля примените патч
 из каталога `site` к подготовленной выше копии ядра.
 
+Во время чтения параметров этот профиль использует окна по 64 МиБ с запасом для записи на
+границе окна. Счётчик показывает позицию в исходном потоке параметров.
+
 ```powershell
 $decoderPatch = (Resolve-Path parallel/rvtio-browser.patch).Path
 git -C $readerCore apply --check $decoderPatch

@@ -32,6 +32,20 @@ async function main() {
     });
     const requests = [];
     context.on('request', request => requests.push(new URL(request.url()).pathname));
+    await context.addInitScript(() => {
+      window.parameterProgress = [];
+      window.Worker = class extends Worker {
+        constructor(url, options) {
+          super(url, options);
+          if (String(url).includes('/fast-reader/')) {
+            this.addEventListener('message', ({ data }) => {
+              if (data.progress?.key === 'view.paramCount')
+                window.parameterProgress.push([data.progress.completed, data.progress.total]);
+            });
+          }
+        }
+      };
+    });
     const page = await context.newPage();
     await page.goto(url);
     const capabilities = await page.evaluate(() => ({
@@ -71,6 +85,13 @@ async function main() {
     const wasm = requests.filter(path => /\/dotnet\.native\.[a-z0-9]+\.wasm$/.test(path));
     assert(wasm.length === 1 && wasm[0].includes('/fast-reader/'),
       `Expected only the fast reader for the visible frame at ${Math.round(frameMs)} ms. WASM requests: ${wasm.join(', ')}`);
+    const progress = await page.evaluate(() => window.parameterProgress);
+    assert(progress.length > 2, 'Expected progress throughout the parameter scan');
+    const total = progress[0][1];
+    assert(total > 0 && progress[0][0] === 0 && progress.at(-1)[0] === total,
+      'Parameter progress must cover the full input');
+    assert(progress.every(([completed, length], i) => length === total &&
+      completed >= (progress[i - 1]?.[0] ?? 0) && completed <= total), 'Parameter progress must advance in order');
     const viewer = page.frameLocator('#viewer[src^="blob:"]');
     await viewer.locator('#ioviewer-canvas').waitFor({ state: 'visible' });
     assert(await viewer.locator('#ioviewer-message').isHidden(), 'IOViewer reported a model or WebGL error');

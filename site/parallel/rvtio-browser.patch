@@ -2223,6 +2223,109 @@
      }
  }
 +
+--- a/src/RvtIO/Parsing/TfStreamWalker.Bounded.cs
++++ b/src/RvtIO/Parsing/TfStreamWalker.Bounded.cs
+@@ -6,14 +6,17 @@
+     // next item. Only the original logical segment boundaries reset alignment.
+     internal static void WalkBounded(IReadOnlyList<byte[]> chunks, HashSet<uint> knownIds,
+         BlockVisitor visit, RecordVisitor? visitRecord, SegmentSources sources,
+-        int segmentTarget = SegmentTarget, int windowSize = 64 * 1024 * 1024)
++        int segmentTarget = SegmentTarget, int windowSize = 64 * 1024 * 1024,
++        Action<long, long>? progress = null)
+     {
+         if (segmentTarget <= 3 * MaxBlock) throw new ArgumentOutOfRangeException(nameof(segmentTarget));
+         if (windowSize <= 0) throw new ArgumentOutOfRangeException(nameof(windowSize));
+ 
+         var offsets = new long[chunks.Count + 1];
+         for (int i = 0; i < chunks.Count; i++) offsets[i + 1] = offsets[i] + chunks[i].Length;
+-        if (offsets[^1] == 0) return;
++        long total = offsets[^1];
++        progress?.Invoke(0, total);
++        if (total == 0) return;
+         const int lookahead = 2 * MaxBlock;
+         var buffer = GC.AllocateUninitializedArray<byte>((int)Math.Min(offsets[^1], (long)windowSize + lookahead));
+ 
+@@ -45,10 +48,12 @@
+                     offset = 0;
+                 }
+                 sources.SetSegment(chunks, source, chunk, (int)(offsets[source] - start));
++                Action<int>? report = progress == null ? null : offset => progress(start + offset, total);
+                 resume = start + WalkWindow(buffer, length, (int)Math.Max(0, resume - start),
+-                    (int)(end - start), ref aligned, knownIds, visit, visitRecord);
++                    (int)(end - start), ref aligned, knownIds, visit, visitRecord, report);
+             }
+             segmentStart = visitEnd;
+         }
++        progress?.Invoke(total, total);
+     }
+ }
+--- a/src/RvtIO/Parsing/TfStreamWalker.cs
++++ b/src/RvtIO/Parsing/TfStreamWalker.cs
+@@ -140,7 +140,7 @@
+             if (!it.HasValue)
+             {
+                 aligned = false;
+-                pos = reportPosition == null ? NextPossibleItem(buf, n, pos + 1) : pos + 1;
++                pos = NextPossibleItem(buf, n, pos + 1, (int)Math.Min(visitLimit, nextReport));
+                 continue;
+             }
+             var (isBlock, size, eid, cls, dataSize) = it.Value;
+@@ -154,30 +154,36 @@
+         return pos;
+     }
+ 
+-    // Skip only positions where the serialized size and both record markers rule out a header.
+-    // The anchor and size-echo checks still run on every candidate, including unaligned ones.
+-    private static int NextPossibleItem(byte[] data, int length, int position)
+-    {
+-        if (position <= length - 16 && BitConverter.ToUInt64(data, position) == 0
++    // Scanning stops before a progress boundary. Header lookahead uses the full
++    // window so an item starting just before the boundary remains a candidate.
++    private static int NextPossibleItem(byte[] data, int length, int position, int stop)
++    {
++        int candidateLimit = Math.Min(stop, length - 15);
++        if (position < candidateLimit && BitConverter.ToUInt64(data, position) == 0
+             && BitConverter.ToUInt64(data, position + 8) == 0)
+         {
+-            // No all-zero header can anchor. Keep starts whose header reaches the first nonzero byte.
+-            int nonzero = data.AsSpan(position + 16, length - position - 16).IndexOfAnyExcept((byte)0);
+-            if (nonzero < 0) return length - 15;
++            int nonzero = data.AsSpan(position + 16, candidateLimit - position - 1).IndexOfAnyExcept((byte)0);
++            if (nonzero < 0) return candidateLimit;
+             position += nonzero + 1;
+         }
+-        if (!BitConverter.IsLittleEndian || !Vector256.IsHardwareAccelerated) return position;
+-        int width = Vector256<byte>.Count;
++        if (!BitConverter.IsLittleEndian || !Vector128.IsHardwareAccelerated) return position;
++        int width = Vector128<byte>.Count;
++        int vectorLimit = Math.Min(stop, length - 11);
++        var blockSizeLimit = Vector128.Create((byte)16);
++        var r22Low = Vector128.Create((byte)0x3C);
++        var r22High = Vector128.Create((byte)0x05);
++        var r20Low = Vector128.Create((byte)0xF8);
++        var r20High = Vector128.Create((byte)0x04);
+         ref byte first = ref MemoryMarshal.GetArrayDataReference(data);
+-        for (; position <= length - 11 - width; position += width)
+-        {
+-            var low = Vector256.LoadUnsafe(ref first, (nuint)(position + 8));
+-            var high = Vector256.LoadUnsafe(ref first, (nuint)(position + 9));
+-            var middleSize = Vector256.LoadUnsafe(ref first, (nuint)(position + 10));
+-            var highSize = Vector256.LoadUnsafe(ref first, (nuint)(position + 11));
+-            var block = Vector256.LessThan(middleSize, Vector256.Create((byte)16)) & Vector256.Equals(highSize, Vector256<byte>.Zero);
+-            var r22 = Vector256.Equals(low, Vector256.Create((byte)0x3C)) & Vector256.Equals(high, Vector256.Create((byte)0x05));
+-            var r20 = Vector256.Equals(low, Vector256.Create((byte)0xF8)) & Vector256.Equals(high, Vector256.Create((byte)0x04));
++        for (; position <= vectorLimit - width; position += width)
++        {
++            var low = Vector128.LoadUnsafe(ref first, (nuint)(position + 8));
++            var high = Vector128.LoadUnsafe(ref first, (nuint)(position + 9));
++            var middleSize = Vector128.LoadUnsafe(ref first, (nuint)(position + 10));
++            var highSize = Vector128.LoadUnsafe(ref first, (nuint)(position + 11));
++            var block = Vector128.LessThan(middleSize, blockSizeLimit) & Vector128.Equals(highSize, Vector128<byte>.Zero);
++            var r22 = Vector128.Equals(low, r22Low) & Vector128.Equals(high, r22High);
++            var r20 = Vector128.Equals(low, r20Low) & Vector128.Equals(high, r20High);
+             uint candidates = (block | r22 | r20).ExtractMostSignificantBits();
+             if (candidates != 0) return position + BitOperations.TrailingZeroCount(candidates);
+         }
 --- /dev/null
 +++ b/src/RvtIO/RvtFileReader.BrowserGRepWire.cs
 @@ -0,0 +1,758 @@
@@ -4152,7 +4255,25 @@
          var segmentSources = new TfStreamWalker.SegmentSources();
          var nativeBlocks = new TfNativeBlocks(state, segmentSources);
          // the roots the class and stair sources count: the records of the project's block when every stream is read by its framing
-@@ -2833,6 +2867,9 @@
+@@ -2706,11 +2740,13 @@
+         List<(byte[] Data, int Start, uint Size, ushort Class, uint Owner)>? unanchoredTypeRoots =
+             framedRoots ? [] : null;
+         if (framedRoots) RecordFramedRoots(state, unanchoredTypeRoots);
+-        if (progress is null && dumpGrepEids.Count == 0 && !TfBlockDeserializer.CaptureAllFields)
+-            TfStreamWalker.WalkBounded(state.Chunks, state.AllKnownIds, VisitBlock, VisitRecord, segmentSources);
++        Action<long, long>? reportPosition = progress is null
++            ? null : (completed, total) => progress.Report(new("parameter-stream", completed, total));
++        if (dumpGrepEids.Count == 0 && !TfBlockDeserializer.CaptureAllFields)
++            TfStreamWalker.WalkBounded(state.Chunks, state.AllKnownIds, VisitBlock, VisitRecord, segmentSources,
++                progress: reportPosition);
+         else
+-            TfStreamWalker.Walk(state.Chunks, state.AllKnownIds, VisitBlock, VisitRecord,
+-                progress is null ? null : (completed, total) => progress.Report(new("parameter-stream", completed, total)),
++            TfStreamWalker.Walk(state.Chunks, state.AllKnownIds, VisitBlock, VisitRecord, reportPosition,
+                 sources: segmentSources);
+         nativeBlocks.Flush();
+ 
+@@ -2833,6 +2869,9 @@
              {
                  var (data, start) = segmentSources.Retain(seg, bs, (int)ds + 16);
                  wallGeometryCandidates.Add((data, start, ds, cls, eid));
@@ -4162,7 +4283,7 @@
              }
              // Sketch/detail curves at full coverage (safe: extraction has strict filters).
              if (cls == 0x0346 && !state.SketchCurves.ContainsKey(eid))
-@@ -2888,11 +2925,14 @@
+@@ -2888,11 +2927,14 @@
              blockGeometry.GetAwaiter().GetResult();
              DiagnosticSink.WriteLine($"GRep blocks: {state.GrepBlocks.Count} elements");
          }
@@ -4178,7 +4299,7 @@
  
          // Second pass: geometry blocks the anchored walk missed. Family symbols live in
          // the family doc's own id space (absent from ElemTable), so whole symbol regions
-@@ -2923,9 +2963,18 @@
+@@ -2923,9 +2965,18 @@
              int foundSketch = 0;
              var scanGReps = new List<(byte[] Segment, int Start, uint Size, uint Eid)>();
              bool scanSlices = dumpGrepEids.Count == 0 && !GRepParserV2.IsDecodeTracingEnabled();
@@ -4198,7 +4319,7 @@
              DiagnosticSink.WriteLine($"  [gscan] targeted scan recovered {found} G-blocks + {foundSketch} sketch curves for {missingIds.Count} candidate ids");
  
              void VisitTarget(byte[] seg, int bs, uint ds, ushort cls, uint eid)
-@@ -2967,6 +3016,8 @@
+@@ -2967,6 +3018,8 @@
                  if (state.GrepBlocks.ContainsKey(eid)) return;
                  var (data, start) = scanSlices ? (seg, bs) : segmentSources.Retain(seg, bs, (int)ds + 16);
                  scanGReps.Add((data, start, ds, eid));
@@ -4207,7 +4328,7 @@
              }
          }
          ReadOwnWallPlanarBodies(state, wallGeometryCandidates);
-@@ -2974,14 +3025,64 @@
+@@ -2974,14 +3027,64 @@
  
      /// <summary>Decodes collected GRep blocks in parallel and stores, in collection order, the first decodable block of
      /// each element that has none yet. Returns the number stored.</summary>
@@ -4274,7 +4395,7 @@
          bool slowDiag = Environment.GetEnvironmentVariable("RVTIO_GREP_SLOW") is { Length: > 0 };
          if (OperatingSystem.IsBrowser() || unreadable == null || slowDiag)
          {
-@@ -3027,6 +3128,27 @@
+@@ -3027,6 +3130,27 @@
          }
          return stored;
  
@@ -4302,7 +4423,7 @@
          GRepData? Decode((byte[] Segment, int Start, uint Size, uint Eid) job)
          {
              var clock = slowDiag ? System.Diagnostics.Stopwatch.StartNew() : null;
-@@ -3041,8 +3163,21 @@
+@@ -3041,8 +3165,21 @@
      internal static bool StoreFirstDecodableGRep(ParsingState state, uint eid, GRepData? geometry) =>
          geometry != null && state.GrepBlocks.TryAdd(eid, geometry);
  
@@ -4325,7 +4446,7 @@
      {
          const int passCount = 8;
          int completedPasses = 0;
-@@ -3117,7 +3252,9 @@
+@@ -3117,7 +3254,9 @@
              BlockParser.ParseChunk(chunk, state, collectBlockOnlyIds: true, deferred: firstPassGReps);
          foreach (var chunk in state.RecordChunks.Where(Scanned))
              BlockParser.ParseChunk(chunk, state, collectBlockOnlyIds: true, deferred: firstPassGReps);
@@ -4336,7 +4457,7 @@
          diag?.WriteLine($"Block-only elements: {state.BlockOnlyIds.Count}");
  
          Lap("first parse pass");
-@@ -3133,11 +3270,22 @@
+@@ -3133,11 +3272,22 @@
              foreach (var chunk in state.RecordChunks.Where(Scanned))
                  BlockParser.ParseChunk(chunk, state, deferred: secondPassGReps);
              BlockParser.SkipRepeatedFirstGReps(firstPassGReps, secondPassGReps);
@@ -4361,7 +4482,7 @@
          diag?.WriteLine($"FamilyInstance transforms: {state.FamilyInstanceTransforms.Count} elements");
          diag?.WriteLine($"Dimensions/constraints (0x091F+0x009D): {state.Dimensions.Count} elements");
          diag?.WriteLine($"Sketch-line curves (0x0346): {state.SketchCurves.Count} elements");
-@@ -3234,9 +3382,11 @@
+@@ -3234,9 +3384,11 @@
      }
  
  
@@ -4376,7 +4497,7 @@
      {
          // Scan all chunks for [FFFFFFFF][header][GUID:16][00 00][nameLen:4][caption]
          var guidToCaption = new Dictionary<Guid, string>();
-@@ -3290,6 +3440,31 @@
+@@ -3290,6 +3442,31 @@
              }
              return captions;
          }
@@ -4408,7 +4529,7 @@
          // Resolve GUID to elemId via record chunk table [GUID:16][elemId:4]
          var guidToElemId = new Dictionary<Guid, uint>();
          foreach (var (eid, g) in state.ParamDefGuids)
-@@ -3299,14 +3474,6 @@
+@@ -3299,14 +3476,6 @@
              var g = BipHelpers.ParseGuidFromForgeId(def.ForgeId);
              if (g.HasValue) guidToElemId.TryAdd(g.Value, eid);
          }
@@ -4423,7 +4544,7 @@
          foreach (var ids in idsByChunk)
              if (ids != null)
                  foreach (var (guid, eid) in ids) guidToElemId[guid] = eid;
-@@ -3338,15 +3505,48 @@
+@@ -3338,15 +3507,48 @@
          return set;
      }
  
@@ -4476,7 +4597,7 @@
              var g = new Guid(chunk.AsSpan(i, 16));
              if (!guidToCaption.ContainsKey(g)) continue;
              uint eid = BitConverter.ToUInt32(chunk, i + 16);
-@@ -4026,3 +4226,6 @@
+@@ -4026,3 +4228,6 @@
      public string ClassIdxHex => $"0x{ClassIdx:X8}";
      public double AvgSize => Count > 0 ? (double)TotalBytes / Count : 0;
  }
