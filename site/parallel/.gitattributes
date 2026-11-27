@@ -1,0 +1,2 @@
+# Unified diffs represent an empty context line with one space.
+rvtio-browser.patch text eol=lf whitespace=-blank-at-eol

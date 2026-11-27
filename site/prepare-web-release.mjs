@@ -23,6 +23,8 @@ const entries = [
   'brand/avatar.png', 'brand/banner.png', 'brand/voxel-building.png',
 ];
 const paged = ['mesh-pages-worker.js', 'paged-storage.js', 'paged-viewer.html'];
+const parallelProfile = /^export \* as decoders from '\.\/reader-decoders\.js';?$/m;
+if (parallelProfile.test(await readFile(join(root, 'reader-profile.js'), 'utf8'))) entries.push('reader-decoders.js');
 const optional = await Promise.all(paged.map(file => readFile(join(root, file)).catch(error => {
   if (error.code === 'ENOENT') return null;
   throw error;
@@ -100,6 +102,7 @@ async function writeAsset(path, bytes) {
 async function readReaderModules(ui) {
   const reader = await readFile(join(ui, 'reader.js'));
   const dependencies = ['reader-host.js', 'reader-profile.js', 'viewer-theme.js'];
+  if (parallelProfile.test(await readFile(join(ui, 'reader-profile.js'), 'utf8'))) dependencies.push('reader-decoders.js');
   if (reader.includes("from './reader-scratch.js'")) dependencies.push('reader-scratch.js');
   const modules = await Promise.all(dependencies.map(async name => [name, await readFile(join(ui, name))]));
   return new Map([['reader.js', reader], ...modules]);

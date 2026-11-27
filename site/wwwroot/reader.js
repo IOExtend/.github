@@ -1,8 +1,11 @@
 import './reader-host.js';
 import { dotnet } from './_framework/dotnet.js';
-import { pooledGc, rvtGcParams, threaded } from './reader-profile.js';
+import * as profile from './reader-profile.js';
 import { bufferScratchFile } from './reader-scratch.js';
 import { viewerTheme } from './viewer-theme.js';
+
+const { pooledGc, rvtGcParams, threaded } = profile;
+const parallel = profile.decoders;
 
 const memoryError = /garbage collector could not allocate|failed to allocate memory for the lock free allocator|out of memory|outofmemoryexception|cannot enlarge memory|could not allocate \d+.* bytes/i;
 // Release versions of Mono can report the eglib allocation failure with its text stripped.
@@ -54,7 +57,10 @@ function viewerPage(bytes) {
   });
 }
 
-self.onmessage = async ({ data: { file, scratchDirectory } }) => {
+self.onmessage = async ({ data }) => {
+  if (data.parameterWorker && parallel) return parallel.startDecoder(dotnet, data);
+  const { file, scratchDirectory } = data;
+  let decoders;
   let exhaustedMemory = false;
   let exhaustedStorage = false;
   let trapped = false;
@@ -77,6 +83,7 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
   let result;
   try {
     const isRvt = /\.rvt$/i.test(file.name);
+    if (parallel && isRvt && crossOriginIsolated) decoders = parallel.createDecoders(dotnet);
     if (scratchDirectory && globalThis.FileSystemFileHandle?.prototype.createSyncAccessHandle) {
       try {
         const budget = isRvt && pooledGc ? { available: scratchCacheBytes } : null;
@@ -141,6 +148,7 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
       return written;
     }
     setModuleImports('viewer', {
+      ...decoders?.imports,
       updateGcProfile(phase, total) {
         if (phase === 'build-model' && total > 0) setSgenPool(1);
       },
@@ -191,6 +199,7 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
         }
       },
       reportProgress(percent, key, completed, total) {
+        if (key === 'phase.element-properties') decoders?.retireIdleDecoders();
         checkingContainer = false;
         if (key === 'view.geometry') {
           console.debug('IOExtend geometry', JSON.stringify({ key, completed, total, wasmBytes: localHeapViewU8().byteLength }));
@@ -215,6 +224,7 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
     self.postMessage({ progress: { percent: 5, key: 'view.check' } });
     nextContainerReport = performance.now() + 500;
     const { Program } = exports;
+    if (decoders) await decoders.connect(Program, localHeapViewU8);
     const bytes = scratch.length === 2 && typeof Program.OpenPagedModel === 'function'
       ? await Program.OpenPagedModel(file.name, file.size)
       : await Program.OpenModel(file.name, file.size, scratch.length === 2);
@@ -239,6 +249,7 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
         error instanceof WebAssembly.RuntimeError || runtimeTrap.test(detail ?? '');
   } finally {
     console.error = logError;
+    decoders?.close();
     for (const handle of scratch) {
       try {
         handle.close();

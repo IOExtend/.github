@@ -60,10 +60,21 @@ git -C $readerCore cherry-pick --no-commit $browserFix
 В проверенной паре сборок веб-читатель и нативный экспортёр используют IOViewer
 `b12b27a5708b0b08c2a241311ac2254cac31a984`. Передайте каталог этой ревизии в `IOViewerSource`. [IOViewer #82](https://github.com/IOExtend/IOViewer/pull/82)
 
+Профиль `IOExtendParallelReader` распределяет обработку параметров и геометрии между четырьмя
+браузерными воркерами. Ещё один воркер читает имена. Координатор загружает нативный WASM один раз
+через загрузчик .NET и передаёт полученные байты воркерам. Для этого профиля примените патч
+из каталога `site` к подготовленной выше копии ядра.
+
 ```powershell
-dotnet publish IOExtend.Web.csproj -c Release --artifacts-path ../artifacts/fast-reader -o ../artifacts/fast-reader/publish -p:IOExtendFastReader=true -p:IOExtendPooledGc=true -p:RvtIOPartitionScratch=false "-p:RvtIOProgressSource=$((Resolve-Path $readerCore).Path)" -p:IOViewerSource=/path/to/IOViewer
+$decoderPatch = (Resolve-Path parallel/rvtio-browser.patch).Path
+git -C $readerCore apply --check $decoderPatch
+git -C $readerCore apply $decoderPatch
+dotnet publish IOExtend.Web.csproj -c Release --artifacts-path ../artifacts/fast-reader -o ../artifacts/fast-reader/publish -p:IOExtendParallelReader=true -p:IOExtendPooledGc=true -p:RvtIOPartitionScratch=false "-p:RvtIOProgressSource=$((Resolve-Path $readerCore).Path)" -p:IOViewerSource=/path/to/IOViewer
 node prepare-web-release.mjs publish-web-aot/wwwroot --fast-reader ../artifacts/fast-reader/publish/wwwroot
 ```
+
+Для контрольной сборки с одним воркером используйте ядро с исправлением #310 до применения
+патча, отдельный каталог артефактов и `-p:IOExtendFastReader=true` вместо `-p:IOExtendParallelReader=true`.
 
 Рабочая страница выбирает быстрый воркер для RVT до 50 МиБ при изоляции источника, от 8 ГиБ памяти по данным браузера
 и от пяти логических процессоров. Воркер формирует автономную сцену из того же исходного RVT. Страница повторяет
