@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self'; frame-src 'self' blob:; base-uri 'none'; form-action 'none'">
+  <title>IOExtend — инструменты для BIM</title>
+  <link rel="icon" type="image/png" href="./brand/avatar.png">
+  <link rel="stylesheet" href="./site.css">
+  <link rel="stylesheet" href="./operations.css">
+  <script type="module" src="./site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="#view">
+        <img src="./brand/banner.png" width="224" height="63" alt="IOExtend">
+      </a>
+      <nav class="tools-nav" aria-label="Инструменты BIM" data-i18n="navigation" data-i18n-attr="aria-label">
+        <a href="#view" aria-current="page" data-i18n="view">Просмотр</a>
+        <a href="#export" data-i18n="export">Экспорт</a>
+        <a href="#downgrade" data-i18n="downgrade">Версия Revit</a>
+      </nav>
+      <div class="header-actions">
+        <a class="source-link" href="https://github.com/IOExtend">GitHub</a>
+        <div class="language-control">
+          <span class="language-globe" aria-hidden="true"></span>
+          <select id="site-language" aria-label="Язык"></select>
+        </div>
+      </div>
+    </div>
+  </header>
+  <main id="app" data-mode="view">
+  <section id="workspace" aria-label="3D-просмотр модели" data-i18n="viewerTitle" data-i18n-attr="aria-label">
+    <div id="status-bar">
+      <div id="status-content">
+        <p id="status" role="status"></p>
+        <div id="open-progress" hidden>
+          <progress id="open-meter" max="100" value="0" aria-label="Примерный прогресс открытия модели" data-i18n="openingProgress" data-i18n-attr="aria-label"></progress>
+          <span id="open-percent" aria-hidden="true"></span>
+          <span id="open-elapsed"></span>
+        </div>
+      </div>
+      <button id="cancel" type="button" data-i18n="cancel" aria-describedby="status" hidden>Отменить</button>
+    </div>
+    <div id="drop-area">
+      <div class="drop-content">
+        <h1 data-i18n="drop">Перетащите модель</h1>
+        <ul class="viewer-formats" aria-label="Поддерживаемые форматы" data-i18n="supported" data-i18n-attr="aria-label">
+          <li><code>.rvt</code> Revit</li>
+          <li><code>.nwc</code> Navisworks</li>
+        </ul>
+        <button id="open-file" type="button" data-i18n="chooseFile">Выбрать файл</button>
+        <p class="privacy" data-i18n="privacy">Файл обрабатывается на вашем устройстве.</p>
+      </div>
+      <img class="viewport-illustration" src="./brand/voxel-building.png" width="272" height="192" alt="">
+    </div>
+    <div id="model-bar" hidden>
+      <span id="model-name"></span>
+      <button id="replace-file" type="button" data-i18n="replaceModel">Открыть другую модель</button>
+    </div>
+    <iframe id="viewer" class="viewer-frame" title="3D-просмотр модели" data-i18n="viewerTitle" data-i18n-attr="title" sandbox="allow-scripts" hidden></iframe>
+    <input id="file-input" type="file" accept=".rvt,.nwc" hidden>
+  </section>
+  <section id="operations" aria-labelledby="operation-title" hidden>
+    <div class="operation-heading">
+      <h1 id="operation-title"></h1>
+      <p id="operation-description"></p>
+    </div>
+    <form id="operation-form" class="operation-form">
+      <div class="operation-source">
+        <h2 data-i18n="sourceFile">Исходный файл</h2>
+        <div id="operation-drop" class="operation-drop">
+          <input id="operation-input" type="file" hidden>
+          <p id="operation-file" class="file-name">Перетащите модель сюда</p>
+          <p id="operation-accept" class="operation-hint"></p>
+          <button id="choose-operation" type="button" class="secondary">Выбрать файл</button>
+        </div>
+        <p class="operation-hint operation-privacy" data-i18n="operationPrivacy">Файлы обрабатываются в браузере и остаются на вашем устройстве.</p>
+      </div>
+      <div class="operation-settings">
+        <div id="export-settings">
+          <div class="operation-section-title">
+            <h2 data-i18n="exportFormats">Форматы экспорта</h2>
+            <button id="select-formats" class="quiet" type="button" data-i18n="selectMain" hidden>Выбрать основные</button>
+          </div>
+          <p id="formats-empty" class="operation-hint" data-i18n="formatsEmpty">Список появится после выбора исходного файла.</p>
+          <div id="format-list"></div>
+          <details id="optional-formats" hidden>
+            <summary data-i18n="optionalFormats">Дополнительные данные модели</summary>
+            <p class="operation-hint" data-i18n="optionalHint">Для этих форматов исходная модель должна содержать соответствующие данные.</p>
+            <div id="optional-format-list"></div>
+          </details>
+        </div>
+        <div id="downgrade-settings" hidden>
+          <h2><label for="target-version" data-i18n="targetVersion">Целевая версия Revit</label></h2>
+          <p class="operation-hint" id="source-version" role="status">Выберите исходный RVT или RFA.</p>
+          <select id="target-version" aria-describedby="source-version" disabled>
+            <option value="">Выберите версию</option>
+          </select>
+          <p class="operation-hint downgrade-note" data-i18n="downgradeNote">Экспериментально. Часть данных, специфичных для новой версии, может быть недоступна в полученной копии.</p>
+        </div>
+        <div class="operation-actions">
+          <button id="run-operation" type="submit" disabled></button>
+          <button id="cancel-operation" class="secondary" type="button" data-i18n="cancel" aria-describedby="operation-phase" hidden>Отменить</button>
+        </div>
+        <section id="operation-progress" aria-label="Ход обработки" data-i18n="operationProgress" data-i18n-attr="aria-label" hidden>
+          <div class="operation-progress-row">
+            <strong id="operation-phase" role="status"></strong>
+            <span id="operation-elapsed"></span>
+          </div>
+          <progress id="operation-meter" aria-labelledby="operation-phase" aria-describedby="operation-count"></progress>
+          <p id="operation-count"></p>
+          <p id="operation-io"></p>
+          <div id="operation-batch" hidden>
+            <label id="operation-batch-label" for="operation-batch-meter"></label>
+            <progress id="operation-batch-meter"></progress>
+          </div>
+        </section>
+      </div>
+    </form>
+    <p id="operation-status" class="operation-status" role="status"></p>
+    <section id="operation-results" class="operation-results" aria-labelledby="results-title" hidden>
+      <h2 id="results-title" data-i18n="results">Результаты</h2>
+      <ul id="operation-downloads"></ul>
+    </section>
+  </section>
+  </main>
+</body>
+</html>
