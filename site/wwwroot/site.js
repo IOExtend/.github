@@ -368,7 +368,6 @@ async function openFile(file) {
     }
     frame ??= await stageFrame(open, pagesFiles);
     open.controller.signal.throwIfAborted();
-    performance.measure('ioextend:first-frame', { start: started });
 
     const oldScratch = displayedScratch;
     const oldUrl = modelUrl;
@@ -388,6 +387,7 @@ async function openFile(file) {
     viewer.hidden = modelBar.hidden = false;
     dropArea.hidden = true;
     modelName.textContent = file.name;
+    performance.measure('ioextend:first-frame', { start: started });
 
     if (result.errors) showStatus(message('view.readErrors'), true);
     else if (result.warnings) showStatus(message('view.readWarnings'));

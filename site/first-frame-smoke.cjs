@@ -39,14 +39,35 @@ async function main() {
     }));
     assert(capabilities.isolated && capabilities.cores >= 5 && capabilities.memoryGiB >= 8,
       'Fast opening requires an isolated page, at least five logical processors and 8 GiB reported by Chromium');
+    await page.evaluate(() => {
+      const original = document.querySelector('#viewer');
+      document.querySelector('#file-input').addEventListener('change', () => {
+        const selectedAt = performance.now();
+        const observer = new MutationObserver(() => {
+          const frame = document.querySelector('#viewer');
+          if (!frame || frame === original || frame.inert || !frame.checkVisibility({ opacityProperty: true })) return;
+          observer.disconnect();
+          // Allow the parent page to paint the revealed iframe before sampling the clock.
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            if (frame.isConnected && !document.hidden && frame.checkVisibility({ opacityProperty: true }))
+              performance.measure('smoke:visible-frame', { start: selectedAt });
+          }));
+        });
+        observer.observe(original.parentNode, { childList: true });
+      }, { capture: true, once: true });
+    });
     await page.locator('#file-input').setInputFiles(rvtPath);
     const selected = page.locator('#model-name').getByText(basename(rvtPath), { exact: true });
     const error = page.locator('#status[data-error]');
     await selected.or(error).waitFor({ timeout: 120_000 });
     assert(await selected.isVisible() && !await error.isVisible(), await page.locator('#status').textContent());
 
-    const frameMs = await page.evaluate(() => performance.getEntriesByName('ioextend:first-frame').at(-1)?.duration);
-    assert(Number.isFinite(frameMs) && frameMs > 0, 'Missing the rendered-frame timing');
+    await page.waitForFunction(() => performance.getEntriesByName('smoke:visible-frame').length > 0);
+    const { readyMs, frameMs } = await page.evaluate(() => ({
+      readyMs: performance.getEntriesByName('ioextend:first-frame').at(-1)?.duration,
+      frameMs: performance.getEntriesByName('smoke:visible-frame').at(-1).duration,
+    }));
+    assert(Number.isFinite(readyMs) && readyMs > 0 && frameMs >= readyMs, 'Invalid visible-frame timing');
     const viewer = page.frameLocator('#viewer[src^="blob:"]');
     await viewer.locator('#ioviewer-canvas').waitFor({ state: 'visible' });
     assert(await viewer.locator('#ioviewer-message').isHidden(), 'IOViewer reported a model or WebGL error');
@@ -80,7 +101,7 @@ async function main() {
     const wasm = requests.filter(path => /\/dotnet\.native\.[a-z0-9]+\.wasm$/.test(path));
     assert.equal(wasm.length, 1, 'Expected a single WASM download');
     assert(wasm[0].includes('/fast-reader/'), 'The page opened through the fallback reader');
-    console.log(JSON.stringify({ chromium: browser.version(), firstFrameMs: Math.round(frameMs),
+    console.log(JSON.stringify({ chromium: browser.version(), firstFrameMs: Math.round(frameMs), viewerReadyMs: Math.round(readyMs),
       elements: counts[0], instances: counts[1], packagedGeometries: counts[2], groups, geometryHash, nativeGeometryHash }));
   } finally {
     await browser.close();

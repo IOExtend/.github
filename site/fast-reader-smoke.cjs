@@ -35,6 +35,17 @@ async function run(browser, scenario) {
     const frameTimeout = scenario === 'frame-timeout';
     const clocked = timed || slowFrame || frameTimeout || scenario === 'cancel';
     if (clocked) await page.clock.install();
+    if (scenario === 'fast') await page.addInitScript(() => {
+      const measure = performance.measure.bind(performance);
+      performance.measure = (name, ...options) => {
+        if (name === 'ioextend:first-frame') {
+          const frame = document.querySelector('#viewer');
+          window.visibleAtFirstFrame = Boolean(frame && !frame.inert &&
+            frame.checkVisibility({ opacityProperty: true }) && !document.querySelector('.viewer-loading'));
+        }
+        return measure(name, ...options);
+      };
+    });
     if (timed) await page.addInitScript(() => {
       const Worker = window.Worker;
       window.Worker = class extends Worker {
@@ -128,6 +139,7 @@ async function run(browser, scenario) {
       }
       await page.locator('#model-name').getByText(name, { exact: true }).waitFor();
       if (!clocked) assert.equal(await page.evaluate(() => performance.getEntriesByName('ioextend:first-frame').length), 1);
+      if (scenario === 'fast') assert.equal(await page.evaluate(() => window.visibleAtFirstFrame), true);
       assert.equal(await page.locator('#viewer').count(), 1);
       assert.equal(await page.locator('.viewer-loading').count(), 0);
       assert.deepEqual(workers, ['fast', 'shared-file', 'progress', 'slow-frame'].includes(scenario) ? ['fast']
