@@ -40,12 +40,28 @@ dotnet publish -c Release -o publish-web-aot -p:IOExtendAot=true -p:RvtIOProgres
 неиспользуемого кода. Воркер читает RVT и возвращает автономный HTML. Основная сборка обслуживает NWC,
 постраничный просмотр и резервное открытие RVT. Для сравнения с нативным экспортом передайте ту же ревизию
 IOViewer. Используйте отдельный каталог промежуточных файлов для каждого профиля, чтобы компоновщик применил
-параметры обрезки. В `RvtIOProgressSource` укажите исходники RvtIO с поддержкой однопоточного браузерного
-воркера. При проверке чистой ревизии `d6e7d8b` на образце Revit 2027 быстрый путь завершился с
-`Arg_PlatformNotSupported`, и сайт открыл модель через основной загрузчик.
+параметры обрезки. В чистом RvtIO `d6e7d8b` расчёт количеств дверей и окон ожидает фоновую задачу.
+Однопоточный WebAssembly в этом месте выдаёт `Arg_PlatformNotSupported`, и сайт открывает файл повторно.
+Для быстрого читателя подготовьте отдельный каталог с этой ревизией и исправлением браузерного пути.
+Команды подготовки исходников рассчитаны на новый каталог. [RvtIO #310](https://github.com/IOExtend/RvtIO/pull/310)
 
 ```powershell
-dotnet publish IOExtend.Web.csproj -c Release --artifacts-path ../artifacts/fast-reader -o ../artifacts/fast-reader/publish -p:IOExtendFastReader=true -p:IOExtendPooledGc=true -p:RvtIOPartitionScratch=false -p:RvtIOProgressSource=/path/to/RvtIO -p:IOViewerSource=/path/to/IOViewer
+$readerCore = "../artifacts/fast-reader-src"
+$main = "d6e7d8b8b447a18750c4e75ab03487e24b75c541"
+$browserFix = "74d2c997bf80e7a923e6036f98a1fbbf70141e4a"
+git init $readerCore
+git -C $readerCore remote add origin https://github.com/IOExtend/RvtIO.git
+git -C $readerCore sparse-checkout set src/RvtIO src/RvtIO.Scene
+git -C $readerCore fetch --no-tags --depth=2 --filter=blob:none origin $main $browserFix
+git -C $readerCore checkout --detach $main
+git -C $readerCore cherry-pick --no-commit $browserFix
+```
+
+В проверенной паре сборок веб-читатель и нативный экспортёр используют IOViewer
+`b12b27a5708b0b08c2a241311ac2254cac31a984`. Передайте каталог этой ревизии в `IOViewerSource`. [IOViewer #82](https://github.com/IOExtend/IOViewer/pull/82)
+
+```powershell
+dotnet publish IOExtend.Web.csproj -c Release --artifacts-path ../artifacts/fast-reader -o ../artifacts/fast-reader/publish -p:IOExtendFastReader=true -p:IOExtendPooledGc=true -p:RvtIOPartitionScratch=false "-p:RvtIOProgressSource=$((Resolve-Path $readerCore).Path)" -p:IOViewerSource=/path/to/IOViewer
 node prepare-web-release.mjs publish-web-aot/wwwroot --fast-reader ../artifacts/fast-reader/publish/wwwroot
 ```
 
@@ -129,10 +145,15 @@ node smoke.cjs http://127.0.0.1:8976/ path/to/sample.rvt path/to/sample.nwc
 Для сборки с `-p:RvtIOPartitionScratch=false` задайте `IOEXTEND_RVT_PARTITION_SCRATCH=0`, чтобы проверка учитывала набор событий прогресса этой версии ядра.
 
 Для замера полного кадра подготовьте релиз с быстрым читателем и откройте его через локальный HTTP-сервер с
-`Cross-Origin-Opener-Policy: same-origin` и `Cross-Origin-Embedder-Policy: require-corp`. Сохраните автономный
-HTML-экспорт исходного `racbasicsampleproject.rvt` из Revit 2027 через нативную сборку RvtIO с IOViewer.
+`Cross-Origin-Opener-Policy: same-origin` и `Cross-Origin-Embedder-Policy: require-corp`. Для нативного контроля
+передайте чистый RvtIO `main` и ту же ревизию IOViewer, что использует сайт. `NativeHtmlExport` читает исходный
+RVT через `RvtSceneReader.Read` и записывает автономную сцену через `HtmlViewerExporter.Export` в новый файл.
+В JSON-результате `readMs` включает чтение и построение сцены, а `exportMs` также включает запись и закрытие
+HTML. Запускайте нативный и браузерный замеры последовательно.
 
 ```powershell
+dotnet build ../tools/NativeHtmlExport -c Release --artifacts-path ../artifacts/native -p:RvtIOSource=/path/to/clean/RvtIO -p:IOViewerSource=/path/to/IOViewer
+dotnet ../artifacts/native/bin/NativeHtmlExport/release/NativeHtmlExport.dll path/to/racbasicsampleproject.rvt path/to/native-export.html
 node first-frame-smoke.cjs http://127.0.0.1:8976/ path/to/racbasicsampleproject.rvt path/to/native-export.html
 ```
 

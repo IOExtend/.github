@@ -69,11 +69,14 @@
       <_ReaderProfile>$(IntermediateOutputPath)reader-profile.js</_ReaderProfile>
       <_UsePooledGc>false</_UsePooledGc>
       <_UsePooledGc Condition="'$(IOExtendPooledGc)' == 'true'">true</_UsePooledGc>
+      <_RvtGcParams>soft-heap-limit=512m</_RvtGcParams>
+      <_RvtGcParams Condition="'$(_UsePooledGc)' == 'true'">soft-heap-limit=512m,nursery-size=16m</_RvtGcParams>
+      <_RvtGcParams Condition="'$(_UsePooledGc)' == 'true' and '$(IOExtendFastReader)' == 'true'">soft-heap-limit=2048m,nursery-size=64m</_RvtGcParams>
       <_UseThreads>false</_UseThreads>
       <_UseThreads Condition="'$(WasmEnableThreads)' == 'true'">true</_UseThreads>
     </PropertyGroup>
     <MakeDir Directories="$(IntermediateOutputPath)" />
-    <WriteLinesToFile File="$(_ReaderProfile)" Lines="export const pooledGc = $(_UsePooledGc);export const threaded = $(_UseThreads)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_ReaderProfile)" Lines="export const pooledGc = $(_UsePooledGc);export const threaded = $(_UseThreads);export const rvtGcParams = '$(_RvtGcParams)'" Overwrite="true" WriteOnlyWhenDifferent="true" />
     <ItemGroup>
       <Content Include="$(_ReaderProfile)" Link="wwwroot/reader-profile.js"
                CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

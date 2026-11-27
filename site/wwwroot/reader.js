@@ -1,6 +1,6 @@
 import './reader-host.js';
 import { dotnet } from './_framework/dotnet.js';
-import { pooledGc, threaded } from './reader-profile.js';
+import { pooledGc, rvtGcParams, threaded } from './reader-profile.js';
 import { bufferScratchFile } from './reader-scratch.js';
 import { viewerTheme } from './viewer-theme.js';
 
@@ -111,7 +111,7 @@ self.onmessage = async ({ data: { file, scratchDirectory } }) => {
     }
     // Mono's WebAssembly heap cannot shrink. Collect temporary RVT decode data before growing it.
     const runtime = isRvt
-      ? dotnet.withEnvironmentVariable('MONO_GC_PARAMS', pooledGc ? 'soft-heap-limit=512m,nursery-size=16m' : 'soft-heap-limit=512m')
+      ? dotnet.withEnvironmentVariable('MONO_GC_PARAMS', rvtGcParams)
       : dotnet;
     const { getAssemblyExports, getConfig, localHeapViewU8, Module, setModuleImports } = await runtime.create();
     if (threaded)
