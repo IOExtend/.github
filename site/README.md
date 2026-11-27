@@ -145,7 +145,8 @@ node smoke.cjs http://127.0.0.1:8976/ path/to/sample.rvt path/to/sample.nwc
 Для сборки с `-p:RvtIOPartitionScratch=false` задайте `IOEXTEND_RVT_PARTITION_SCRATCH=0`, чтобы проверка учитывала набор событий прогресса этой версии ядра.
 
 Для замера полного кадра подготовьте релиз с быстрым читателем и откройте его через локальный HTTP-сервер с
-`Cross-Origin-Opener-Policy: same-origin` и `Cross-Origin-Embedder-Policy: require-corp`. Для нативного контроля
+`Cross-Origin-Opener-Policy: same-origin` и `Cross-Origin-Embedder-Policy: require-corp`. Из каталога `site`
+такой сервер запускается командой `python serve-preview.py publish-web-aot/wwwroot`. Для нативного контроля
 передайте чистый RvtIO `main` и ту же ревизию IOViewer, что использует сайт. `NativeHtmlExport` читает исходный
 RVT через `RvtSceneReader.Read` и записывает автономную сцену через `HtmlViewerExporter.Export` в новый файл.
 В JSON-результате `readMs` включает чтение и построение сцены, а `exportMs` также включает запись и закрытие

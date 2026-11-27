@@ -96,6 +96,16 @@ async function run(browser, scenario) {
       await page.locator('#operation-input').setInputFiles(file);
       assert.equal(await page.locator('#operation-file').textContent(), name);
       await page.locator('nav a[href="#view"]').click();
+    } else if (scenario === 'at-limit' || scenario === 'over-limit') {
+      await page.locator('#file-input').evaluate((input, { name, over }) => {
+        const mib = new Blob([new Uint8Array(1024 * 1024)]);
+        const parts = Array(50).fill(mib);
+        if (over) parts.push(new Uint8Array(1));
+        const transfer = new DataTransfer();
+        transfer.items.add(new File(parts, name));
+        input.files = transfer.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }, { name, over: scenario === 'over-limit' });
     } else {
       await page.locator('#file-input').setInputFiles(file);
     }
@@ -142,8 +152,8 @@ async function run(browser, scenario) {
       if (scenario === 'fast') assert.equal(await page.evaluate(() => window.visibleAtFirstFrame), true);
       assert.equal(await page.locator('#viewer').count(), 1);
       assert.equal(await page.locator('.viewer-loading').count(), 0);
-      assert.deepEqual(workers, ['fast', 'shared-file', 'progress', 'slow-frame'].includes(scenario) ? ['fast']
-        : ['memory', 'unisolated', 'nwc'].includes(scenario) ? ['bounded'] : ['fast', 'bounded']);
+      assert.deepEqual(workers, ['fast', 'shared-file', 'progress', 'slow-frame', 'at-limit'].includes(scenario) ? ['fast']
+        : ['memory', 'unisolated', 'nwc', 'over-limit'].includes(scenario) ? ['bounded'] : ['fast', 'bounded']);
     }
     assert.deepEqual(failures, []);
     console.log('Fast reader smoke passed (' + scenario + ').');
@@ -175,7 +185,7 @@ async function runIsolation(browser, root) {
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.VIEWER_CHROME || undefined });
   try {
-    for (const scenario of ['fast', 'shared-file', 'failure', 'read-error', 'renderer', 'timeout', 'progress', 'slow-frame', 'frame-timeout', 'cancel', 'memory', 'unisolated', 'nwc'])
+    for (const scenario of ['fast', 'shared-file', 'failure', 'read-error', 'renderer', 'timeout', 'progress', 'slow-frame', 'frame-timeout', 'cancel', 'memory', 'unisolated', 'nwc', 'at-limit', 'over-limit'])
       await run(browser, scenario);
     if (staticUrl) await runIsolation(browser, staticUrl);
   } finally {

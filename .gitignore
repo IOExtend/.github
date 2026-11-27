@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 .venv/
 
+# Local viewer builds, reference exports and benchmark dependencies
+/artifacts/
+
 # Editors and OS metadata
 .vs/
 .idea/
